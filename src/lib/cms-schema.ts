@@ -135,6 +135,22 @@ export const PAGE_SCHEMAS: Record<string, SectionSchema[]> = {
       ]
     },
     {
+      key: 'founder',
+      label: 'Meet Our Founder',
+      description: 'Configure the Founder section values.',
+      fields: [
+        { key: 'badge', label: 'Badge Text', type: 'text', placeholder: 'Meet Our Founder' },
+        { key: 'name', label: 'Founder Name', type: 'text', placeholder: 'Gulshan Kumar' },
+        { key: 'title', label: 'Founder Title', type: 'text', placeholder: 'Founder & CEO, XmartyCreator' },
+        { key: 'quote', label: 'Founder Quote', type: 'richtext', placeholder: '"Our mission is simple..."' },
+        { key: 'bio', label: 'Founder Bio', type: 'richtext', placeholder: 'Gulshan Kumar started...' },
+        { key: 'image', label: 'Founder Image', type: 'image' },
+        { key: 'twitter', label: 'Twitter URL', type: 'text', placeholder: 'https://twitter.com/...' },
+        { key: 'linkedin', label: 'LinkedIn URL', type: 'text', placeholder: 'https://linkedin.com/in/...' },
+        { key: 'github', label: 'GitHub URL', type: 'text', placeholder: 'https://github.com/...' }
+      ]
+    },
+    {
       key: 'seo',
       label: 'SEO Metadata',
       description: 'Configure SEO metadata for the About page.',

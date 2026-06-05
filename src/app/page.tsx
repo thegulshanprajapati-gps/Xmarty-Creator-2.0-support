@@ -61,13 +61,40 @@ const DUMMY_USERS = [
 ];
 
 export default function SupportDashboard() {
-  const courses = DUMMY_COURSES;
-  const users = DUMMY_USERS;
+  const [usersCount, setUsersCount] = useState<number | string>('...');
+  const [coursesCount, setCoursesCount] = useState<number | string>('...');
+  const [revenue, setRevenue] = useState<number>(45231);
+  const [latency, setLatency] = useState<string>('1.2ms');
+  const [chartData, setChartData] = useState<any[]>(CHART_DATA);
+  const [logs, setLogs] = useState<any[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/dashboard/stats');
+        if (res.ok) {
+          const data = await res.json();
+          setUsersCount(data.usersCount);
+          setCoursesCount(data.coursesCount);
+          setRevenue(data.revenueValue);
+          setLatency(data.latencyValue);
+          if (data.chartData) setChartData(data.chartData);
+          if (data.logs) setLogs(data.logs);
+        }
+      } catch (e) {
+        console.error('Error fetching stats:', e);
+      }
+    }
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 3000);
     const timer = setTimeout(() => setIsInitializing(false), 1500);
-    return () => clearTimeout(timer);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
   }, []);
 
   return (
@@ -125,21 +152,21 @@ export default function SupportDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard 
                 title="Identity Entities" 
-                value={users?.length.toString() || '45,231'} 
+                value={String(usersCount)} 
                 icon={Users} 
                 trend="+12.5%" 
                 description="Authenticated students"
               />
               <StatCard 
                 title="Curriculum Units" 
-                value={courses?.length.toString() || '120'} 
+                value={String(coursesCount)} 
                 icon={FileText} 
                 trend="+8 new" 
                 description="Course modules active"
               />
               <StatCard 
                 title="Revenue Stream" 
-                value={formatINR(45231)}
+                value={formatINR(revenue)}
                 icon={BarChart3} 
                 trend="+8.4%" 
                 description="Monthly recurring"
@@ -147,7 +174,7 @@ export default function SupportDashboard() {
               />
               <StatCard 
                 title="Engine Latency" 
-                value="1.2ms" 
+                value={latency} 
                 icon={Zap} 
                 trend="Optimal" 
                 description="Core processing speed"
@@ -166,7 +193,7 @@ export default function SupportDashboard() {
                 </CardHeader>
                 <CardContent className="h-[350px] mt-4 p-8">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={CHART_DATA}>
+                    <AreaChart data={chartData}>
                       <defs>
                         <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
@@ -192,12 +219,12 @@ export default function SupportDashboard() {
                 </CardHeader>
                 <CardContent className="flex-1 p-8">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={CHART_DATA}>
+                    <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
                       <Tooltip />
                       <Bar dataKey="students" radius={[6, 6, 0, 0]}>
-                        {CHART_DATA.map((entry, index) => (
+                        {chartData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={index % 2 === 0 ? 'hsl(var(--primary))' : 'hsl(var(--accent))'} />
                         ))}
                       </Bar>
@@ -219,12 +246,7 @@ export default function SupportDashboard() {
               </CardHeader>
               <CardContent className="p-8">
                 <div className="space-y-4">
-                  {[
-                    { action: "Course Published", details: "Advanced Web Arch v4.2", time: "2 mins ago", user: "Admin Sarah" },
-                    { action: "Identity Modified", details: "Role changed for student #4521", time: "15 mins ago", user: "Console Manager" },
-                    { action: "Theme Orchestrated", details: "Applied new primary brand accent", time: "1 hour ago", user: "Admin Marcus" },
-                    { action: "System Sync", details: "Cloudinary orchestration complete", time: "3 hours ago", user: "XmartyCreator Core" },
-                  ].map((log, i) => (
+                  {logs.map((log: any, i: number) => (
                     <div key={i} className="flex items-center justify-between p-5 rounded-2xl bg-background border-2 border-transparent hover:border-muted/20 transition-all group shadow-sm">
                       <div className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-xl bg-muted/5 flex items-center justify-center text-foreground group-hover:bg-muted group-hover:text-white transition-all">
