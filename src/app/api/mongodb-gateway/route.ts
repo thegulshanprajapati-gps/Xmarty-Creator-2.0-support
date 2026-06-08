@@ -19,6 +19,14 @@ export async function POST(req: NextRequest) {
     if (safeFilter._id && typeof safeFilter._id === 'string' && ObjectId.isValid(safeFilter._id)) {
       safeFilter._id = new ObjectId(safeFilter._id);
     }
+    if (safeFilter._id && typeof safeFilter._id === 'object' && safeFilter._id.$in && Array.isArray(safeFilter._id.$in)) {
+      safeFilter._id.$in = safeFilter._id.$in.map((id: any) => {
+        if (typeof id === 'string' && ObjectId.isValid(id)) {
+          return new ObjectId(id);
+        }
+        return id;
+      });
+    }
     if (safeData._id && typeof safeData._id === 'string' && ObjectId.isValid(safeData._id)) {
       safeData._id = new ObjectId(safeData._id);
     }
@@ -60,6 +68,11 @@ export async function POST(req: NextRequest) {
       case 'deleteOne':
         const deleteRes = await collection.deleteOne(safeFilter);
         result = { deletedCount: deleteRes.deletedCount };
+        break;
+      
+      case 'deleteMany':
+        const deleteManyRes = await collection.deleteMany(safeFilter);
+        result = { deletedCount: deleteManyRes.deletedCount };
         break;
 
       default:

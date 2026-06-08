@@ -17,6 +17,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ImagePicker } from "@/components/admin/image-picker";
 import { PAGE_SCHEMAS, SectionSchema, FieldSchema } from "@/lib/cms-schema";
 import { RichTextEditor } from "@/components/admin/rich-text-editor";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SavingOverlay } from "@/components/saving-overlay";
 
 export default function PageEditor() {
   const { pageId } = useParams();
@@ -357,6 +359,49 @@ export default function PageEditor() {
     };
 
     if (field.type === 'text') {
+      const isColorField = field.key.toLowerCase().endsWith('color') || 
+                           field.key.toLowerCase().endsWith('bg') || 
+                           field.key.toLowerCase().includes('colour');
+                           
+      if (isColorField) {
+        return (
+          <div className="flex gap-2 items-center w-full">
+            <div className="relative flex-1">
+              <Input
+                value={effectiveVal}
+                onChange={handleChange}
+                placeholder={field.placeholder || "e.g. #FF0000, hsl(var(--primary)) or transparent"}
+                className="h-14 rounded-2xl text-lg pl-14 pr-10 border-primary/10 bg-background shadow-sm"
+              />
+              <div 
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-primary/10 shadow-inner flex items-center justify-center overflow-hidden cursor-pointer bg-slate-100 dark:bg-slate-800"
+                style={{ backgroundColor: effectiveVal && effectiveVal !== 'transparent' ? effectiveVal : 'transparent' }}
+              >
+                {!effectiveVal || effectiveVal === 'transparent' ? (
+                  <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[8px] font-bold text-muted-foreground">None</div>
+                ) : null}
+                <input 
+                  type="color" 
+                  value={effectiveVal && effectiveVal.startsWith('#') && (effectiveVal.length === 7 || effectiveVal.length === 4) ? effectiveVal : '#3b82f6'} 
+                  onChange={(e) => handleChange(e.target.value)}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+              </div>
+              {effectiveVal && (
+                <button 
+                  type="button"
+                  onClick={() => handleChange('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-sm font-bold"
+                  title="Clear color"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <Input
           value={effectiveVal}
@@ -406,31 +451,30 @@ export default function PageEditor() {
       return (
         <div className="flex gap-2 items-center w-full">
           <div className="relative flex-1">
-            <select
-              value={isCustomValue ? 'custom' : effectiveVal}
-              onChange={(e) => {
-                const selectedValue = e.target.value;
-                if (selectedValue === 'custom') {
+            <Select
+              value={isCustomValue ? 'custom' : (effectiveVal || undefined)}
+              onValueChange={(val) => {
+                if (val === 'custom') {
                   handleChange('custom');
                 } else {
-                  handleChange(selectedValue);
+                  handleChange(val);
                 }
               }}
-              className="w-full h-14 rounded-2xl text-lg px-6 pr-10 border border-primary/10 bg-background shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer select-none"
             >
-              <option value="">Select a role...</option>
-              {options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </option>
-              ))}
-              {field.allowCustom && (
-                <option value="custom">Custom Role...</option>
-              )}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center px-2 text-muted-foreground">
-              ▼
-            </div>
+              <SelectTrigger className="w-full h-14 rounded-2xl text-lg px-6 border border-primary/10 bg-background shadow-sm">
+                <SelectValue placeholder="Select a role..." />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border border-primary/10">
+                {options.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </SelectItem>
+                ))}
+                {field.allowCustom && (
+                  <SelectItem value="custom">Custom Role...</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
           </div>
           
           {(isCustomValue || effectiveVal === 'custom') && (
@@ -593,14 +637,19 @@ export default function PageEditor() {
   return (
     <SidebarProvider>
       <AdminSidebar />
-      <SidebarInset className="bg-background/95">
-        <header className="flex h-20 shrink-0 items-center gap-4 border-b border-primary/10 bg-background/50 backdrop-blur-xl px-8 sticky top-0 z-50 transition-all duration-300">
+      <SidebarInset className="bg-background/95 relative">
+        {/* Background blur decorative elements */}
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+          <div className="absolute top-32 -right-20 w-[300px] h-[300px] bg-primary/[0.03] rounded-full blur-[100px]" />
+          <div className="absolute bottom-32 -left-20 w-[250px] h-[250px] bg-accent/[0.05] rounded-full blur-[100px]" />
+        </div>
+        <header className="flex h-16 shrink-0 items-center gap-2 md:gap-4 border-b border-primary/10 bg-background/50 backdrop-blur-xl px-3 md:px-8 sticky top-0 z-50 transition-all duration-300">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-2xl hover:bg-primary/10">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 flex items-center justify-between">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-              <h1 className="font-headline font-bold text-2xl tracking-tight text-foreground">
+              <h1 className="font-headline font-bold text-lg md:text-2xl tracking-tight text-foreground">
                 Editing <span className="text-primary capitalize">{pageSlug}</span>
               </h1>
               <div className="flex gap-2 items-center">
@@ -610,7 +659,7 @@ export default function PageEditor() {
               </div>
             </div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button size="lg" onClick={saveContent} disabled={saving || dbStatus === 'error' || schemas.length === 0} className="rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold px-6 h-12 transition-all">
+              <Button size="sm" onClick={saveContent} disabled={saving || dbStatus === 'error' || schemas.length === 0} className="rounded-xl md:rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold px-3 md:px-6 h-9 md:h-12 transition-all text-xs md:text-sm">
                 {saving ? (
                   <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving to DB...</>
                 ) : (
@@ -621,18 +670,18 @@ export default function PageEditor() {
           </div>
         </header>
 
-        <main className="p-8 max-w-7xl mx-auto space-y-10">
+        <main className="p-3 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-10 relative z-10">
            <Tabs defaultValue={defaultTab} className="space-y-8">
-            <TabsList className="bg-muted/40 p-1.5 h-auto md:h-16 rounded-[2rem] flex flex-wrap md:flex-nowrap w-full items-center gap-2 border border-primary/5 shadow-inner">
+            <TabsList className="bg-muted/40 p-1 md:p-1.5 h-auto md:h-16 rounded-xl md:rounded-[2rem] flex flex-nowrap w-full items-center gap-1 md:gap-2 border border-primary/5 shadow-inner overflow-x-auto">
               {schemas.map(section => (
-                <TabsTrigger key={section.key} value={section.key} className="flex-1 min-w-[120px] rounded-2xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md transition-all py-2.5 px-4 whitespace-nowrap h-12 flex items-center justify-center text-sm">
+                <TabsTrigger key={section.key} value={section.key} className="flex-shrink-0 md:flex-1 min-w-fit md:min-w-[120px] rounded-xl md:rounded-2xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md transition-all py-2 md:py-2.5 px-3 md:px-4 whitespace-nowrap h-9 md:h-12 flex items-center justify-center text-xs md:text-sm">
                   {section.label}
                 </TabsTrigger>
               ))}
-              <TabsTrigger value="preview" className="flex-1 min-w-[120px] rounded-2xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md transition-all py-2.5 px-4 whitespace-nowrap h-12 flex items-center justify-center text-sm">
+              <TabsTrigger value="preview" className="flex-shrink-0 md:flex-1 min-w-fit md:min-w-[120px] rounded-xl md:rounded-2xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md transition-all py-2 md:py-2.5 px-3 md:px-4 whitespace-nowrap h-9 md:h-12 flex items-center justify-center text-xs md:text-sm">
                 Live Preview
               </TabsTrigger>
-              <TabsTrigger value="assets" className="flex-1 min-w-[120px] rounded-2xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md transition-all py-2.5 px-4 whitespace-nowrap h-12 flex items-center justify-center text-sm">
+              <TabsTrigger value="assets" className="flex-shrink-0 md:flex-1 min-w-fit md:min-w-[120px] rounded-xl md:rounded-2xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md transition-all py-2 md:py-2.5 px-3 md:px-4 whitespace-nowrap h-9 md:h-12 flex items-center justify-center text-xs md:text-sm">
                 Global Assets
               </TabsTrigger>
             </TabsList>
@@ -647,14 +696,14 @@ export default function PageEditor() {
             {schemas.map(section => (
               <TabsContent key={section.key} value={section.key} className="space-y-8 mt-0 outline-none">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                  <Card className="border-primary/10 shadow-2xl shadow-primary/5 rounded-[2.5rem] overflow-hidden bg-gradient-to-b from-background to-muted/20">
-                    <CardHeader className="border-b border-primary/5 bg-primary/5 pb-8 pt-10 px-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <Card className="border-primary/10 shadow-2xl shadow-primary/5 rounded-2xl md:rounded-[2.5rem] overflow-hidden bg-gradient-to-b from-background to-muted/20 backdrop-blur-sm">
+                    <CardHeader className="border-b border-primary/5 bg-primary/5 pb-4 md:pb-8 pt-6 md:pt-10 px-4 md:px-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="h-14 w-14 rounded-2xl bg-primary/20 flex items-center justify-center text-primary shadow-inner">
+                        <div className="h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-2xl bg-primary/20 flex items-center justify-center text-primary shadow-inner shrink-0">
                           <LayoutTemplate className="h-7 w-7" />
                         </div>
                         <div>
-                          <CardTitle className="font-headline text-3xl">{section.label}</CardTitle>
+                          <CardTitle className="font-headline text-xl md:text-3xl">{section.label}</CardTitle>
                           {section.description && <CardDescription className="text-base mt-1">{section.description}</CardDescription>}
                         </div>
                       </div>
@@ -673,8 +722,8 @@ export default function PageEditor() {
                       )}
                     </CardHeader>
                     
-                    <CardContent className="p-10">
-                      <div className="grid gap-10 lg:grid-cols-2">
+                    <CardContent className="p-4 md:p-10">
+                      <div className="grid gap-6 md:gap-10 lg:grid-cols-2">
                         {section.fields.map(field => {
                           const val = content[section.key]?.[field.key] || '';
                           
@@ -833,70 +882,21 @@ export default function PageEditor() {
         </main>
       </SidebarInset>
 
-      {saveStatus !== 'idle' && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <Card className="rounded-[2.5rem] border-primary/10 shadow-2xl bg-background p-10 max-w-md w-full flex flex-col items-center space-y-6 animate-in zoom-in-95 duration-350">
-            {saveStatus === 'saving' && (
-              <div className="flex flex-col items-center space-y-6 w-full">
-                <div className="relative flex items-center justify-center">
-                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}>
-                    <Loader2 className="h-16 w-16 text-primary opacity-20" />
-                  </motion.div>
-                  <span className="absolute text-sm font-bold text-primary">{saveProgress}%</span>
-                </div>
-                <div className="text-center space-y-2">
-                  <h3 className="text-2xl font-headline font-bold text-foreground">Publishing Changes</h3>
-                  <p className="text-sm text-muted-foreground">Uploading blocks to MongoDB Atlas...</p>
-                </div>
-                <div className="w-full bg-muted rounded-full h-3.5 overflow-hidden border">
-                  <div 
-                    className="bg-primary h-full rounded-full transition-all duration-300 ease-out" 
-                    style={{ width: `${saveProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {saveStatus === 'success' && (
-              <div className="flex flex-col items-center space-y-5 text-center">
-                <div className="h-16 w-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500 shadow-inner">
-                  <CheckCircle2 className="h-10 w-10 animate-bounce" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-headline font-bold text-foreground">Successfully Published!</h3>
-                  <p className="text-sm text-muted-foreground">All page blocks successfully updated in database.</p>
-                </div>
-              </div>
-            )}
-
-            {saveStatus === 'error' && (
-              <div className="flex flex-col items-center space-y-5 text-center w-full">
-                <div className="h-16 w-16 bg-destructive/10 rounded-full flex items-center justify-center text-destructive shadow-inner">
-                  <AlertTriangle className="h-10 w-10 animate-pulse" />
-                </div>
-                <div className="space-y-2 w-full">
-                  <h3 className="text-2xl font-headline font-bold text-foreground">Publish Failed</h3>
-                  <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 p-4 rounded-2xl break-words font-mono max-h-32 overflow-y-auto">
-                    {saveErrorMessage}
-                  </p>
-                  <p className="text-xs text-amber-500 font-bold uppercase tracking-wider mt-2">
-                    🔄 Editor state successfully reverted to backup
-                  </p>
-                </div>
-                <Button 
-                  onClick={() => {
-                    setSaveStatus('idle');
-                    setSaving(false);
-                  }}
-                  className="bg-primary w-full h-12 rounded-xl font-bold"
-                >
-                  Dismiss
-                </Button>
-              </div>
-            )}
-          </Card>
-        </div>
-      )}
+      <SavingOverlay 
+        isVisible={saveStatus !== 'idle'}
+        status={saveStatus === 'saving' ? 'saving' : saveStatus === 'success' ? 'success' : 'error'}
+        progress={saveProgress}
+        title="Publishing Changes"
+        description="Uploading blocks to MongoDB Atlas..."
+        successTitle="Successfully Published!"
+        successDescription="All page blocks successfully updated in database."
+        errorTitle="Publish Failed"
+        errorDescription={saveErrorMessage}
+        onClose={() => {
+          setSaveStatus('idle');
+          setSaving(false);
+        }}
+      />
     </SidebarProvider>
   );
 }

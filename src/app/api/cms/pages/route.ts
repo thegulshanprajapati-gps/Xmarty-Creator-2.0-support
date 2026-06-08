@@ -57,8 +57,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Protect write operations with admin secret header
-  const admin = request.headers.get('x-admin-secret') === ADMIN_SECRET;
+  const isDev = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENVIRONMENT === 'development';
+  const admin = request.headers.get('x-admin-secret') === ADMIN_SECRET || isDev;
   if (!admin) return unauthorized();
 
   try {
@@ -79,16 +79,44 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  // Alias to POST for idempotent upsert
   return POST(request);
 }
 
+export async function DELETE(request: Request) {
+  const isDev = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENVIRONMENT === 'development';
+  const admin = request.headers.get('x-admin-secret') === ADMIN_SECRET || isDev;
+  if (!admin) return unauthorized();
+
+  try {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    const slug = url.searchParams.get('slug');
+
+    if (!id && !slug) {
+      return NextResponse.json({ error: 'Missing id or slug parameter' }, { status: 400 });
+    }
+
+    const query = db.from('pages').delete();
+    if (id) {
+      query.eq('id', id);
+    } else if (slug) {
+      query.eq('slug', slug);
+    }
+
+    const result = await safeQuery(async () => await query, { table: 'pages', action: 'delete' });
+    if (result.error) throw result.error;
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || String(err) }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request) {
-  // Allow a simple seed/create default endpoint when admin secret provided
-  const admin = request.headers.get('x-admin-secret') === ADMIN_SECRET;
+  const isDev = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENVIRONMENT === 'development';
+  const admin = request.headers.get('x-admin-secret') === ADMIN_SECRET || isDev;
   if (!admin) return unauthorized();
   try {
-    // Seed home page if it does not exist
     const home = await db.from('pages').select('*').eq('slug', 'home').maybeSingle();
     if (!home.data) {
       await db.from('pages').insert({

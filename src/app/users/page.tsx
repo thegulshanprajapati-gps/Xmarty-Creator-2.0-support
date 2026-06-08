@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface AdminUser {
   id: string;
@@ -25,20 +27,22 @@ interface AdminUser {
   createdAt?: string;
 }
 
-const roles = ['student', 'instructor', 'moderator', 'admin', 'super_admin'];
+// Fixed role options for the User Directory — exactly these 4 roles
+const USER_ROLES = ['super_admin', 'admin', 'instructor', 'student'] as const;
 
 export default function UsersAdminPage() {
+  const confirm = useConfirm();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
-  const [activeMainSection, setActiveMainSection] = useState<"teacher" | "student" | null>("teacher");
+  const [activeMainSection, setActiveMainSection] = useState<string | null>(null);
   
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState('student');
+  const [newUserRole, setNewUserRole] = useState<string>('student');
   const [isCreating, setIsCreating] = useState(false);
 
   const fetchCurrentUser = async () => {
@@ -65,14 +69,18 @@ export default function UsersAdminPage() {
       setError(error.message);
       setUsers([]);
     } else {
-      setUsers((data || []).map((profile: any) => ({
+      const STAFF_ROLES = ['admin', 'super_admin', 'editor'];
+      const filteredProfiles = (data || []).filter((profile: any) => !STAFF_ROLES.includes(profile.role));
+      
+      const usersData: AdminUser[] = filteredProfiles.map((profile: any) => ({
         id: profile.id,
         email: profile.email,
         name: profile.full_name || profile.name || 'Anonymous',
-        role: profile.role || 'student',
+        role: profile.role || '',
         enrolledCourses: profile.enrolled_courses || [],
         createdAt: profile.created_at ? new Date(profile.created_at).toLocaleString() : 'Unknown',
-      })));
+      }));
+      setUsers(usersData);
     }
     setLoading(false);
   };
@@ -80,13 +88,26 @@ export default function UsersAdminPage() {
   useEffect(() => {
     fetchCurrentUser();
     fetchUsers();
+
+    const handlePolicyTrigger = () => {
+      setShowCreateForm(true);
+    };
+    window.addEventListener('users-policy', handlePolicyTrigger);
+    return () => {
+      window.removeEventListener('users-policy', handlePolicyTrigger);
+    };
   }, []);
 
+  const roleGroups = useMemo<string[]>(() => {
+    return Array.from(new Set(users.map((user) => user.role || '')))
+      .filter((role): role is string => Boolean(role))
+      .sort();
+  }, [users]);
+
   const changeRole = async (userId: string, newRole: string) => {
-    // Only the superadmin can modify roles
     const isSuperAdmin = currentUser?.email === 'admin@xmartycreator.com';
     if (!isSuperAdmin) {
-      alert("Unauthorized. Only the Super Admin (admin@xmartycreator.com) can modify roles!");
+      toast({ variant: 'destructive', title: 'Unauthorized', description: 'Only the Super Admin can modify roles!' });
       return;
     }
 
@@ -96,7 +117,15 @@ export default function UsersAdminPage() {
     if (error) {
       setError(error.message);
     } else {
-      setUsers((prev) => prev.map((user) => user.id === userId ? { ...user, role: newRole } : user));
+      const STAFF_ROLES = ['admin', 'super_admin', 'editor'];
+      if (STAFF_ROLES.includes(newRole)) {
+        // Remove from local users state so they disappear instantly
+        setUsers((prev) => prev.filter((user) => user.id !== userId));
+        toast({ title: 'Promoted to Staff', description: 'User has been moved to the Staff Console!' });
+      } else {
+        setUsers((prev) => prev.map((user) => user.id === userId ? { ...user, role: newRole } : user));
+        toast({ title: 'Success', description: 'User role updated successfully!' });
+      }
     }
     setLoading(false);
   };
@@ -104,11 +133,18 @@ export default function UsersAdminPage() {
   const removeUser = async (userId: string) => {
     const isSuperAdmin = currentUser?.email === 'admin@xmartycreator.com';
     if (!isSuperAdmin) {
-      alert("Unauthorized. Only the Super Admin can delete users!");
+      toast({ variant: 'destructive', title: 'Unauthorized', description: 'Only the Super Admin can delete users!' });
       return;
     }
 
-    if (!confirm('Delete user profile and associated role data? This cannot be undone.')) return;
+    const isConfirmed = await confirm({
+      title: 'Delete User Profile',
+      message: 'Delete user profile and associated role data? This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel'
+    });
+    if (!isConfirmed) return;
+    
     setLoading(true);
     setError("");
     const { error } = await db.from('profiles').delete().eq('id', userId);
@@ -116,6 +152,7 @@ export default function UsersAdminPage() {
       setError(error.message);
     } else {
       setUsers((prev) => prev.filter((user) => user.id !== userId));
+      toast({ title: 'Success', description: 'User profile deleted.' });
     }
     setLoading(false);
   };
@@ -123,7 +160,7 @@ export default function UsersAdminPage() {
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail || !newUserName) {
-      alert("Please fill in Name and Email!");
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fill in Name and Email!' });
       return;
     }
     setIsCreating(true);
@@ -148,7 +185,7 @@ export default function UsersAdminPage() {
       setNewUserRole('student');
       setShowCreateForm(false);
       await fetchUsers();
-      alert("User registered successfully!");
+      toast({ title: 'Success', description: 'User registered successfully!' });
     } catch (err: any) {
       setError(err.message || String(err));
     } finally {
@@ -156,11 +193,6 @@ export default function UsersAdminPage() {
     }
   };
 
-  // Filter lists based on roles
-  const teachers = users.filter(u => ['instructor', 'teacher', 'moderator'].includes(u.role || ''));
-  const students = users.filter(u => ['student', 'user'].includes(u.role || ''));
-
-  // Authorization check
   const isSuperAdmin = currentUser?.email === 'admin@xmartycreator.com';
 
   return (
@@ -190,7 +222,6 @@ export default function UsersAdminPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               
-              {/* Super Admin Registration Form */}
               {isSuperAdmin && showCreateForm && (
                 <form onSubmit={createUser} className="mb-8 p-6 rounded-[2rem] border border-amber-200 dark:border-amber-500/20 bg-amber-500/[0.02] space-y-4">
                   <h3 className="font-headline text-lg font-bold text-amber-800 dark:text-yellow-400">Register New Member</h3>
@@ -219,16 +250,18 @@ export default function UsersAdminPage() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground ml-1">Role</label>
-                       <Select value={newUserRole} onValueChange={(val) => setNewUserRole(val)}>
-                         <SelectTrigger className="w-full h-11 px-4 rounded-xl border bg-background focus:ring-1 focus:ring-amber-500 outline-none">
-                           <SelectValue placeholder="Select Role" />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {roles.map(r => (
-                             <SelectItem key={r} value={r}>{r}</SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
+                         <Select value={newUserRole} onValueChange={(val) => setNewUserRole(val)}>
+                           <SelectTrigger className="w-full h-11 px-4 rounded-xl border bg-background focus:ring-1 focus:ring-amber-500 outline-none">
+                             <SelectValue placeholder="Select Role" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {USER_ROLES.map((r) => (
+                               <SelectItem key={r} value={r}>
+                                 {r.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                               </SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
@@ -246,157 +279,95 @@ export default function UsersAdminPage() {
                 </div>
               )}
 
-              {/* TAP-TO-EXPAND USER SECTIONS */}
               <div className="space-y-4">
-                
-                {/* 1. TEACHERS SECTION */}
-                <div className="border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden bg-background shadow-sm">
-                  <button 
-                    onClick={() => setActiveMainSection(activeMainSection === "teacher" ? null : "teacher")}
-                    className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-muted/10 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-yellow-500 border border-amber-500/20">
-                        <i className="fa-solid fa-chalkboard-user text-lg"></i>
-                      </div>
-                      <div>
-                        <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white">Teachers / Instructors</h3>
-                        <p className="text-xs text-muted-foreground">List of certified platform instructors ({teachers.length} active).</p>
-                      </div>
-                    </div>
-                    <i className={`fa-solid ${activeMainSection === "teacher" ? "fa-chevron-up" : "fa-chevron-down"} text-muted-foreground`}></i>
-                  </button>
-
-                  <AnimatePresence initial={false}>
-                    {activeMainSection === "teacher" && (
-                      <motion.div 
-                        initial={{ height: 0 }}
-                        animate={{ height: "auto" }}
-                        exit={{ height: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="overflow-hidden border-t border-slate-100 dark:border-white/5"
-                      >
-                        <div className="p-6">
-                          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-background">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>User</TableHead>
-                                  <TableHead>Email</TableHead>
-                                  <TableHead>Role</TableHead>
-                                  <TableHead>Joined</TableHead>
-                                  {isSuperAdmin && <TableHead>Actions</TableHead>}
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {teachers.map((user) => (
-                                  <TableRow key={user.id}>
-                                    <TableCell className="font-bold">{user.name}</TableCell>
-                                    <TableCell>{user.email}</TableCell>
-                                    <TableCell>
-                                      <select
-                                        disabled={!isSuperAdmin}
-                                        value={user.role}
-                                        onChange={(e) => changeRole(user.id, e.target.value)}
-                                        className="rounded-md border bg-background px-2 py-1 text-sm disabled:opacity-80 disabled:cursor-not-allowed"
-                                      >
-                                        {roles.map((r) => (
-                                          <option key={r} value={r}>{r}</option>
-                                        ))}
-                                      </select>
-                                    </TableCell>
-                                    <TableCell>{user.createdAt}</TableCell>
-                                    {isSuperAdmin && (
-                                      <TableCell>
-                                        <Button size="sm" variant="destructive" onClick={() => removeUser(user.id)}>Delete</Button>
-                                      </TableCell>
-                                    )}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                {roleGroups.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-slate-300 p-10 text-center text-muted-foreground">
+                    No user roles found in the database.
+                  </div>
+                ) : (
+                  roleGroups.map((roleKey) => {
+                    const sectionUsers = users.filter((user) => user.role === roleKey);
+                    return (
+                      <div key={roleKey} className="border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden bg-background shadow-sm">
+                        <button
+                          onClick={() => setActiveMainSection(activeMainSection === roleKey ? null : roleKey)}
+                          className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-muted/10 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-muted/10 flex items-center justify-center text-foreground border border-border">
+                              <span className="text-sm uppercase font-bold">{roleKey.slice(0, 2)}</span>
+                            </div>
+                            <div>
+                              <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white">{roleKey}</h3>
+                              <p className="text-xs text-muted-foreground">{sectionUsers.length} {sectionUsers.length === 1 ? 'user' : 'users'} assigned to this role.</p>
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                          <i className={`fa-solid ${activeMainSection === roleKey ? 'fa-chevron-up' : 'fa-chevron-down'} text-muted-foreground`} />
+                        </button>
 
-                {/* 2. STUDENTS SECTION */}
-                <div className="border border-slate-200 dark:border-white/10 rounded-[2rem] overflow-hidden bg-background shadow-sm">
-                  <button 
-                    onClick={() => setActiveMainSection(activeMainSection === "student" ? null : "student")}
-                    className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-muted/10 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
-                        <i className="fa-solid fa-graduation-cap text-lg"></i>
+                        <AnimatePresence initial={false}>
+                          {activeMainSection === roleKey && (
+                            <motion.div
+                              initial={{ height: 0 }}
+                              animate={{ height: 'auto' }}
+                              exit={{ height: 0 }}
+                              transition={{ duration: 0.25 }}
+                              className="overflow-hidden border-t border-slate-100 dark:border-white/5"
+                            >
+                              <div className="p-6">
+                                <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-background">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>User</TableHead>
+                                        <TableHead>Email</TableHead>
+                                        <TableHead>Role</TableHead>
+                                        <TableHead>Joined</TableHead>
+                                        {isSuperAdmin && <TableHead>Actions</TableHead>}
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {sectionUsers.map((user) => (
+                                        <TableRow key={user.id}>
+                                          <TableCell className="font-bold">{user.name}</TableCell>
+                                          <TableCell>{user.email}</TableCell>
+                                          <TableCell>
+                                            <Select
+                                              disabled={!isSuperAdmin}
+                                              value={user.role}
+                                              onValueChange={(val) => changeRole(user.id, val)}
+                                            >
+                                              <SelectTrigger className="w-32 h-9 text-xs">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                             <SelectContent>
+                                                {USER_ROLES.map((r) => (
+                                                  <SelectItem key={r} value={r}>
+                                                    {r.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          </TableCell>
+                                          <TableCell>{user.createdAt}</TableCell>
+                                          {isSuperAdmin && (
+                                            <TableCell>
+                                              <Button size="sm" variant="destructive" onClick={() => removeUser(user.id)}>Delete</Button>
+                                            </TableCell>
+                                          )}
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      <div>
-                        <h3 className="font-headline font-bold text-base text-slate-900 dark:text-white">Students</h3>
-                        <p className="text-xs text-muted-foreground">List of active platform students ({students.length} active).</p>
-                      </div>
-                    </div>
-                    <i className={`fa-solid ${activeMainSection === "student" ? "fa-chevron-up" : "fa-chevron-down"} text-muted-foreground`}></i>
-                  </button>
-
-                  <AnimatePresence initial={false}>
-                    {activeMainSection === "student" && (
-                      <motion.div 
-                        initial={{ height: 0 }}
-                        animate={{ height: "auto" }}
-                        exit={{ height: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="overflow-hidden border-t border-slate-100 dark:border-white/5"
-                      >
-                        <div className="p-6">
-                          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-background">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>User</TableHead>
-                                  <TableHead>Email</TableHead>
-                                  <TableHead>Role</TableHead>
-                                  <TableHead>Enrolled Courses</TableHead>
-                                  <TableHead>Joined</TableHead>
-                                  {isSuperAdmin && <TableHead>Actions</TableHead>}
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {students.map((user) => (
-                                  <TableRow key={user.id}>
-                                    <TableCell className="font-bold">{user.name}</TableCell>
-                                    <TableCell>{user.email}</TableCell>
-                                    <TableCell>
-                                      <select
-                                        disabled={!isSuperAdmin}
-                                        value={user.role}
-                                        onChange={(e) => changeRole(user.id, e.target.value)}
-                                        className="rounded-md border bg-background px-2 py-1 text-sm disabled:opacity-80 disabled:cursor-not-allowed"
-                                      >
-                                        {roles.map((r) => (
-                                          <option key={r} value={r}>{r}</option>
-                                        ))}
-                                      </select>
-                                    </TableCell>
-                                    <TableCell>{user.enrolledCourses?.join(', ') || 'None'}</TableCell>
-                                    <TableCell>{user.createdAt}</TableCell>
-                                    {isSuperAdmin && (
-                                      <TableCell>
-                                        <Button size="sm" variant="destructive" onClick={() => removeUser(user.id)}>Delete</Button>
-                                      </TableCell>
-                                    )}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
+                    );
+                  })
+                )}
               </div>
 
             </CardContent>

@@ -8,66 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Edit3, Plus, Save, RotateCcw, Calendar, Clock, BookOpen, AlertCircle, ArrowLeft, Image as ImageIcon, Upload, Globe, Sparkles, Check, X, Search, Loader2 } from "lucide-react";
+import { Trash2, Edit3, Plus, Save, RotateCcw, Calendar, Clock, BookOpen, AlertCircle, ArrowLeft, Image as ImageIcon, Upload, Globe, Sparkles, Check, X, Search, Loader2, Recycle } from "lucide-react";
 import RichTextEditor from "@/components/rich-text-editor";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImagePicker } from "@/components/admin/image-picker";
-
-const DEFAULT_BLOGS = [
-  {
-    id: '1',
-    title: 'The Future of Web Architecture in 2024',
-    slug: 'the-future-of-web-architecture-in-2024',
-    excerpt: 'Exploring how server-side rendering and AI-driven design are reshaping the digital landscape...',
-    author: 'Admin Sarah',
-    date: 'Oct 24, 2024',
-    readTime: '8 min',
-    category: 'Technology',
-    image: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=600&q=80',
-    featured: true,
-    metaTitle: 'The Future of Web Architecture in 2024 | XmartyCreator',
-    metaDescription: 'Read about how server-side rendering and AI-driven design are changing the web architecture industry in 2024.',
-    keywords: 'web architecture, SSR, React server components, AI design',
-    content: `<p>Web architecture is evolving at a breakneck speed. As we move into 2024, the integration of Server-Side Rendering (SSR) with React Server Components (RSC) is becoming the baseline standard for high-performance applications.</p>
-    <p>Furthermore, artificial intelligence is no longer just a backend helper; it is actively shaping dynamic user interfaces in real-time. By utilizing edge networks and modern CMS pipelines, creators can deliver customized content instances to users in milliseconds.</p>
-    <p>XmartyCreator stands at the forefront of this shift, ensuring our developers are equipped with the exact modular tools needed to orchestrate these modern web frameworks.</p>`
-  },
-  {
-    id: '2',
-    title: 'Mastering the XmartyCreator Workflow',
-    slug: 'mastering-the-xmartycreator-workflow',
-    excerpt: 'A comprehensive guide to using our dynamic CMS and enterprise modules for your next big project...',
-    author: 'Marcus Aurelius',
-    date: 'Oct 20, 2024',
-    readTime: '12 min',
-    category: 'Guide',
-    image: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=600&q=80',
-    metaTitle: 'Mastering the XmartyCreator Workflow Guide',
-    metaDescription: 'A step-by-step guide to using CMS providers and dynamic course libraries inside the XmartyCreator environment.',
-    keywords: 'xmartycreator, cms workflow, developers guide',
-    content: `<p>Getting started with a new development ecosystem can be challenging. This guide breaks down the core concepts of the XmartyCreator workspace architecture.</p>
-    <p>From connecting database drivers to modifying global client layouts and configuring initial theme variables, we take you step-by-step through the optimal development cycle.</p>
-    <p>We will also explore how to use the built-in Content Management System (CMS) providers to modify page text inline, empowering non-technical stakeholders to collaborate on copies without git commits.</p>`
-  },
-  {
-    id: '3',
-    title: 'Why AI-Powered Learning is the New Gold Standard',
-    slug: 'why-ai-powered-learning-is-the-new-gold-standard',
-    excerpt: 'How tools like Vasant AI are helping students bridge the gap between theory and real-world execution...',
-    author: 'Vasant AI Team',
-    date: 'Oct 15, 2024',
-    readTime: '6 min',
-    category: 'AI',
-    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
-    metaTitle: 'AI-Powered Learning with Vasant AI | XmartyCreator',
-    metaDescription: 'Understand how dynamic AI tutors like Vasant AI are changing the educational standard for modern programmers.',
-    keywords: 'AI learning, Vasant AI, educational helper, programming courses',
-    content: `<p>Traditional education methods often struggle to scale when dealing with complex, fast-changing technology sectors.</p>
-    <p>AI assistants like Vasant AI solve this bottleneck by providing context-aware, immediate answers to students' compilation and logical queries. Vasant is trained on our core course structure to assist with student projects, debugging, and framework configurations in real time.</p>
-    <p>This allows students to learn at their own pace, transforming passive video absorption into an active, hands-on debugging loop that mirrors a real-world software engineering job.</p>`
-  }
-];
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { FontColorPicker } from "@/components/admin/font-color-picker";
+import Link from "next/link";
 
 const PREDEFINED_CATEGORIES = ["Technology", "Guide", "AI", "General", "Programming"];
 
@@ -81,10 +30,12 @@ const PRESET_IMAGES = [
 ];
 
 export default function BlogsAdminPage() {
+  const confirm = useConfirm();
   const [blogs, setBlogs] = useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [trashCount, setTrashCount] = useState(0);
 
   // Form fields
   const [title, setTitle] = useState('');
@@ -103,24 +54,55 @@ export default function BlogsAdminPage() {
   const [customSlug, setCustomSlug] = useState('');
   const [focusKeyphrase, setFocusKeyphrase] = useState('');
 
-  useEffect(() => {
+  // Font & Color fields
+  const [titleFont, setTitleFont] = useState('');
+  const [titleColor, setTitleColor] = useState('');
+  const [excerptFont, setExcerptFont] = useState('');
+  const [excerptColor, setExcerptColor] = useState('');
+  const [authorFont, setAuthorFont] = useState('');
+  const [authorColor, setAuthorColor] = useState('');
+
+  const fetchBlogs = async () => {
     try {
-      const stored = localStorage.getItem('xmarty_blogs');
-      if (stored) {
-        setBlogs(JSON.parse(stored));
-      } else {
-        setBlogs(DEFAULT_BLOGS);
-        localStorage.setItem('xmarty_blogs', JSON.stringify(DEFAULT_BLOGS));
+      const res = await fetch('/api/blogs');
+      if (res.ok) {
+        const data = await res.json();
+        setBlogs(data);
       }
     } catch (e) {
-      setBlogs(DEFAULT_BLOGS);
+      console.error('Failed to load blogs:', e);
     }
+  };
+
+  const fetchTrashCount = async () => {
+    try {
+      const res = await fetch('/api/blogs/trash');
+      if (res.ok) {
+        const data = await res.json();
+        setTrashCount(Array.isArray(data) ? data.length : 0);
+      }
+    } catch (e) {
+      // silently ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchBlogs();
+    fetchTrashCount();
+
+    const handleCreateNewEvent = () => {
+      handleCreateNew();
+    };
+    window.addEventListener('blog-create-new', handleCreateNewEvent);
+    return () => {
+      window.removeEventListener('blog-create-new', handleCreateNewEvent);
+    };
   }, []);
 
   // Update Page Title / Tab Name dynamically
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      document.title = isEditing 
+      document.title = isEditing
         ? (currentId ? "Edit Post | Xmarty Journal Editor" : "New Post | Xmarty Journal Editor")
         : "Xmarty Journal Admin";
     }
@@ -132,15 +114,6 @@ export default function BlogsAdminPage() {
     const mins = Math.max(1, Math.ceil(words / 200));
     setReadTime(`${mins} min`);
   }, [content]);
-
-  const saveToStorage = (updatedList: any[]) => {
-    setBlogs(updatedList);
-    try {
-      localStorage.setItem('xmarty_blogs', JSON.stringify(updatedList));
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleEdit = (blog: any) => {
     setIsEditing(true);
@@ -158,6 +131,13 @@ export default function BlogsAdminPage() {
     setKeywords(blog.keywords || '');
     setCustomSlug(blog.slug || '');
     setFocusKeyphrase(blog.focusKeyphrase || '');
+    // Font & Color
+    setTitleFont(blog.titleFont || '');
+    setTitleColor(blog.titleColor || '');
+    setExcerptFont(blog.excerptFont || '');
+    setExcerptColor(blog.excerptColor || '');
+    setAuthorFont(blog.authorFont || '');
+    setAuthorColor(blog.authorColor || '');
   };
 
   const handleCreateNew = () => {
@@ -176,16 +156,37 @@ export default function BlogsAdminPage() {
     setKeywords('');
     setCustomSlug('');
     setFocusKeyphrase('');
+    setTitleFont('');
+    setTitleColor('');
+    setExcerptFont('');
+    setExcerptColor('');
+    setAuthorFont('');
+    setAuthorColor('');
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this blog post?")) {
-      const updated = blogs.filter(b => b.id !== id);
-      saveToStorage(updated);
-      toast({ title: "Deleted", description: "Blog post removed successfully." });
-      if (currentId === id) {
-        setIsEditing(false);
-        setCurrentId(null);
+  const handleDelete = async (id: string) => {
+    const isConfirmed = await confirm({
+      title: 'Move to Recycle Bin',
+      message: 'This blog post will be moved to the Recycle Bin and permanently deleted after 10 days.',
+      confirmText: 'Move to Bin',
+      cancelText: 'Cancel'
+    });
+    if (isConfirmed) {
+      try {
+        const res = await fetch(`/api/blogs?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          toast({ title: "Moved to Recycle Bin", description: "Blog post moved to Recycle Bin. Auto-expires in 10 days." });
+          fetchBlogs();
+          fetchTrashCount();
+          if (currentId === id) {
+            setIsEditing(false);
+            setCurrentId(null);
+          }
+        } else {
+          throw new Error('Failed to delete');
+        }
+      } catch (err) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete blog post." });
       }
     }
   };
@@ -218,7 +219,7 @@ export default function BlogsAdminPage() {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !excerpt || !category) {
       toast({ variant: "destructive", title: "Error", description: "Please fill in title, excerpt, and category." });
@@ -230,59 +231,71 @@ export default function BlogsAdminPage() {
       ? customSlug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
       : cleanTitleText.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
-    if (currentId) {
-      // Update
-      const updated = blogs.map(b => b.id === currentId ? {
-        ...b,
-        title,
-        slug: finalSlug,
-        excerpt,
-        category,
-        author,
-        readTime,
-        image,
-        featured,
-        content,
-        metaTitle,
-        metaDescription,
-        keywords,
-        focusKeyphrase
-      } : b);
-      saveToStorage(updated);
-      toast({ title: "Saved", description: "Blog post updated successfully." });
-    } else {
-      // Create
-      const newBlog = {
-        id: String(Date.now()),
-        title,
-        slug: finalSlug,
-        excerpt,
-        category,
-        author,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        readTime,
-        image,
-        featured,
-        content,
-        metaTitle,
-        metaDescription,
-        keywords,
-        focusKeyphrase
-      };
-      saveToStorage([newBlog, ...blogs]);
-      toast({ title: "Created", description: "New blog post published successfully." });
+    const blogDoc = {
+      id: currentId,
+      title,
+      slug: finalSlug,
+      excerpt,
+      category,
+      author,
+      readTime,
+      image,
+      featured,
+      content,
+      metaTitle,
+      metaDescription,
+      keywords,
+      focusKeyphrase,
+      // Font & Color
+      titleFont,
+      titleColor,
+      excerptFont,
+      excerptColor,
+      authorFont,
+      authorColor,
+    };
+
+    try {
+      const res = await fetch('/api/blogs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(blogDoc)
+      });
+      if (res.ok) {
+        toast({ title: currentId ? "Saved" : "Created", description: currentId ? "Blog post updated successfully." : "New blog post published successfully." });
+        fetchBlogs();
+      } else {
+        throw new Error('Failed to save');
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to save blog post." });
     }
 
     setIsEditing(false);
     setCurrentId(null);
   };
 
-  const resetDefaults = () => {
-    if (confirm("Reset blogs to sample layout data?")) {
-      saveToStorage(DEFAULT_BLOGS);
+  const resetDefaults = async () => {
+    const isConfirmed = await confirm({
+      title: 'Reset Blogs',
+      message: 'Reset blogs to sample layout data? This will hard-delete all current blogs (bypassing Recycle Bin).',
+      confirmText: 'Reset',
+      cancelText: 'Cancel'
+    });
+    if (isConfirmed) {
+      try {
+        const res = await fetch('/api/blogs?all=true', { method: 'DELETE' });
+        if (res.ok) {
+          toast({ title: "Reset complete", description: "All blogs removed." });
+          fetchBlogs();
+        } else {
+          throw new Error('Failed to reset');
+        }
+      } catch (err) {
+        toast({ variant: "destructive", title: "Error", description: "Failed to reset blogs." });
+      }
       setIsEditing(false);
       setCurrentId(null);
-      toast({ title: "Reset complete", description: "Default blogs restored." });
     }
   };
 
@@ -297,11 +310,10 @@ export default function BlogsAdminPage() {
     }
 
     setMetaTitle(cleanTitle.slice(0, 60));
-    
-    // Fallback description from excerpt, then content, then empty
+
     const descSource = cleanExcerpt || cleanContent;
     setMetaDescription(descSource.slice(0, 155) + (descSource.length > 155 ? '...' : ''));
-    
+
     if (focusKeyphrase && !keywords.includes(focusKeyphrase)) {
       setKeywords(prev => prev ? `${focusKeyphrase}, ${prev}` : focusKeyphrase);
     }
@@ -337,7 +349,17 @@ export default function BlogsAdminPage() {
             </div>
           </div>
           {!isEditing && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <Link href="/recycle-bin">
+                <Button size="sm" variant="outline" className="border-rose-200/60 hover:bg-rose-500/10 font-bold relative">
+                  <Recycle className="h-4 w-4 mr-1 text-rose-500" /> Recycle Bin
+                  {trashCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center leading-none">
+                      {trashCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
               <Button size="sm" variant="outline" className="border-amber-200/50 hover:bg-amber-500/10 font-bold" onClick={resetDefaults}>
                 <RotateCcw className="h-4 w-4 mr-1 text-amber-600 dark:text-yellow-500" /> Reset Samples
               </Button>
@@ -349,7 +371,7 @@ export default function BlogsAdminPage() {
         </header>
 
         <main className="p-6 md:p-8 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
+
           {/* List panel - collapses when editing */}
           {!isEditing && (
             <div className="lg:col-span-12 space-y-4">
@@ -422,7 +444,7 @@ export default function BlogsAdminPage() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSave} className="space-y-6">
-                    
+
                     {/* Basic Form Details */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-1">
@@ -438,15 +460,28 @@ export default function BlogsAdminPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       <div className="space-y-1 col-span-1">
                         <Label htmlFor="author" className="text-xs font-bold text-slate-600 dark:text-slate-300">Author</Label>
-                        <RichTextEditor 
-                          value={author} 
-                          onChange={setAuthor} 
-                          placeholder="e.g. Admin Sarah" 
-                          className="border border-slate-200 dark:border-slate-800 rounded-xl bg-background text-foreground"
-                        />
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            id="author"
+                            value={author}
+                            onChange={(e) => setAuthor(e.target.value)}
+                            placeholder="e.g. Admin Sarah"
+                            className="h-11 border border-slate-200 dark:border-slate-800 rounded-xl bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:border-amber-500 outline-none w-full shadow-sm font-semibold transition-all"
+                            style={{
+                              fontFamily: authorFont || undefined,
+                              color: authorColor || undefined,
+                            }}
+                          />
+                          <FontColorPicker
+                            font={authorFont}
+                            color={authorColor}
+                            onChange={(f, c) => { setAuthorFont(f); setAuthorColor(c); }}
+                            previewText={author || 'Author Name'}
+                          />
+                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -483,16 +518,16 @@ export default function BlogsAdminPage() {
                           <div className="flex flex-col sm:flex-row gap-3 items-end">
                             <div className="flex-grow space-y-1 w-full">
                               <Label className="text-xs font-bold text-slate-600 dark:text-slate-300">Selected Cover Image URL</Label>
-                              <input 
+                              <input
                                 value={image}
                                 onChange={(e) => setImage(e.target.value)}
                                 placeholder="Cloudinary URL or image address..."
                                 className={premiumInputStyle}
                               />
                             </div>
-                            
+
                             <div className="flex gap-2 shrink-0">
-                              <ImagePicker 
+                              <ImagePicker
                                 onSelect={(url) => {
                                   setImage(url);
                                   toast({ title: "Image Selected", description: "Successfully selected image from Cloudinary library." });
@@ -514,12 +549,12 @@ export default function BlogsAdminPage() {
                                     <Upload className="h-4 w-4" /> Upload to Cloudinary
                                   </>
                                 )}
-                                <input 
-                                  type="file" 
-                                  accept="image/*" 
-                                  onChange={handleFileUpload} 
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleFileUpload}
                                   disabled={uploading}
-                                  className="hidden" 
+                                  className="hidden"
                                 />
                               </label>
                             </div>
@@ -532,26 +567,28 @@ export default function BlogsAdminPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-1">
                         <Label htmlFor="customSlug" className="text-xs font-bold text-slate-600 dark:text-slate-300">URL Slug (e.g. future-of-web)</Label>
-                        <input 
-                          id="customSlug" 
-                          value={customSlug} 
-                          onChange={(e) => setCustomSlug(e.target.value)} 
-                          className={premiumInputStyle} 
-                          placeholder="Leave blank to generate slug from title automatically" 
+                        <input
+                          id="customSlug"
+                          value={customSlug}
+                          onChange={(e) => setCustomSlug(e.target.value)}
+                          className={premiumInputStyle}
+                          placeholder="Leave blank to generate slug from title automatically"
                         />
                       </div>
-                    </div>                    {/* SEO Fields */}
+                    </div>
+
+                    {/* SEO Fields */}
                     <div className="border border-slate-200 dark:border-slate-800 p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 space-y-4">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-2 border-slate-200 dark:border-slate-800 gap-2">
                         <div className="flex items-center gap-2">
                           <Globe className="h-4.5 w-4.5 text-amber-500" />
                           <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">SEO Meta & Search Optimization</h4>
                         </div>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={handleAutoGenerateSEO} 
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAutoGenerateSEO}
                           className="h-8 text-[11px] font-bold border-amber-200/50 text-amber-800 dark:text-yellow-400 hover:bg-amber-500/10 gap-1 rounded-lg"
                         >
                           <Sparkles className="h-3.5 w-3.5" /> Auto-Fill SEO Meta
@@ -563,12 +600,12 @@ export default function BlogsAdminPage() {
                         <div className="lg:col-span-7 space-y-4">
                           <div className="space-y-1">
                             <Label htmlFor="focusKeyphrase" className="text-xs font-bold text-slate-600 dark:text-slate-300">Focus Keyphrase</Label>
-                            <input 
-                              id="focusKeyphrase" 
-                              value={focusKeyphrase} 
-                              onChange={(e) => setFocusKeyphrase(e.target.value)} 
-                              className={premiumInputStyle} 
-                              placeholder="e.g. web architecture" 
+                            <input
+                              id="focusKeyphrase"
+                              value={focusKeyphrase}
+                              onChange={(e) => setFocusKeyphrase(e.target.value)}
+                              className={premiumInputStyle}
+                              placeholder="e.g. web architecture"
                             />
                             <p className="text-[10px] text-muted-foreground">The main keyword phrase you want this article to rank for.</p>
                           </div>
@@ -580,23 +617,23 @@ export default function BlogsAdminPage() {
                                 {metaTitle.length} / 60 chars
                               </span>
                             </div>
-                            <input 
-                              id="metaTitle" 
-                              value={metaTitle} 
-                              onChange={(e) => setMetaTitle(e.target.value)} 
-                              className={premiumInputStyle} 
-                              placeholder="SEO Browser Title tag" 
+                            <input
+                              id="metaTitle"
+                              value={metaTitle}
+                              onChange={(e) => setMetaTitle(e.target.value)}
+                              className={premiumInputStyle}
+                              placeholder="SEO Browser Title tag"
                             />
                           </div>
 
                           <div className="space-y-1">
                             <Label htmlFor="keywords" className="text-xs font-bold text-slate-600 dark:text-slate-300">Keywords (comma separated)</Label>
-                            <input 
-                              id="keywords" 
-                              value={keywords} 
-                              onChange={(e) => setKeywords(e.target.value)} 
-                              className={premiumInputStyle} 
-                              placeholder="e.g. web architecture, SSR, React" 
+                            <input
+                              id="keywords"
+                              value={keywords}
+                              onChange={(e) => setKeywords(e.target.value)}
+                              className={premiumInputStyle}
+                              placeholder="e.g. web architecture, SSR, React"
                             />
                           </div>
 
@@ -607,12 +644,12 @@ export default function BlogsAdminPage() {
                                 {metaDescription.length} / 160 chars
                               </span>
                             </div>
-                            <textarea 
-                              id="metaDescription" 
-                              value={metaDescription} 
-                              onChange={(e) => setMetaDescription(e.target.value)} 
+                            <textarea
+                              id="metaDescription"
+                              value={metaDescription}
+                              onChange={(e) => setMetaDescription(e.target.value)}
                               className="w-full h-20 border border-slate-200 dark:border-slate-800 rounded-xl bg-background p-3 text-sm focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:border-amber-500 outline-none shadow-sm font-semibold transition-all resize-none"
-                              placeholder="SEO Google snippet summary..." 
+                              placeholder="SEO Google snippet summary..."
                             />
                           </div>
                         </div>
@@ -639,7 +676,7 @@ export default function BlogsAdminPage() {
                           {/* SEO Checklist */}
                           <div className="bg-slate-100/50 dark:bg-slate-900/30 border rounded-xl p-4 space-y-3">
                             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">SEO Analysis Checklist</span>
-                            
+
                             <div className="space-y-2 text-xs font-semibold">
                               <div className="flex items-center justify-between">
                                 <span className="text-slate-600 dark:text-slate-400">Keyphrase configured</span>
@@ -700,24 +737,52 @@ export default function BlogsAdminPage() {
                       </div>
                     </div>
 
+                    {/* Title field with FontColorPicker */}
                     <div className="space-y-1">
                       <Label htmlFor="title" className="text-xs font-bold text-slate-600 dark:text-slate-300">Title / Heading</Label>
-                      <RichTextEditor 
-                        value={title} 
-                        onChange={setTitle} 
-                        placeholder="Article Headline" 
-                        className="border border-slate-200 dark:border-slate-800 rounded-xl bg-background text-foreground"
-                      />
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          id="title"
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="Article Headline"
+                          className="h-11 border border-slate-200 dark:border-slate-800 rounded-xl bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:border-amber-500 outline-none w-full shadow-sm font-semibold transition-all"
+                          style={{
+                            fontFamily: titleFont || undefined,
+                            color: titleColor || undefined,
+                          }}
+                        />
+                        <FontColorPicker
+                          font={titleFont}
+                          color={titleColor}
+                          onChange={(f, c) => { setTitleFont(f); setTitleColor(c); }}
+                          previewText={title || 'Article Headline'}
+                        />
+                      </div>
                     </div>
 
+                    {/* Excerpt field with FontColorPicker */}
                     <div className="space-y-1">
                       <Label htmlFor="excerpt" className="text-xs font-bold text-slate-600 dark:text-slate-300">Excerpt / Short Description</Label>
-                      <RichTextEditor 
-                        value={excerpt} 
-                        onChange={setExcerpt} 
-                        placeholder="Brief summary of the post..." 
-                        className="border border-slate-200 dark:border-slate-800 rounded-xl bg-background text-foreground"
-                      />
+                      <div className="flex gap-2 items-start">
+                        <Textarea
+                          id="excerpt"
+                          value={excerpt}
+                          onChange={(e) => setExcerpt(e.target.value)}
+                          placeholder="Brief summary of the post..."
+                          className="w-full h-20 border border-slate-200 dark:border-slate-800 rounded-xl bg-background p-3 text-sm focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:border-amber-500 outline-none shadow-sm font-semibold transition-all resize-none"
+                          style={{
+                            fontFamily: excerptFont || undefined,
+                            color: excerptColor || undefined,
+                          }}
+                        />
+                        <FontColorPicker
+                          font={excerptFont}
+                          color={excerptColor}
+                          onChange={(f, c) => { setExcerptFont(f); setExcerptColor(c); }}
+                          previewText={excerpt || 'Brief summary...'}
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-1.5">
@@ -731,11 +796,11 @@ export default function BlogsAdminPage() {
                     </div>
 
                     <div className="flex items-center gap-2 pt-2">
-                      <input 
-                        type="checkbox" 
-                        id="featured" 
-                        checked={featured} 
-                        onChange={(e) => setFeatured(e.target.checked)} 
+                      <input
+                        type="checkbox"
+                        id="featured"
+                        checked={featured}
+                        onChange={(e) => setFeatured(e.target.checked)}
                         className="rounded border-slate-300 text-amber-500 focus:ring-amber-500 h-4 w-4 cursor-pointer"
                       />
                       <Label htmlFor="featured" className="text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none">

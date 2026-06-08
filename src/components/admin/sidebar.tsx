@@ -47,7 +47,7 @@ const MENU_ITEMS = [
   ]},
   { group: "Orchestration Studio", items: [
     { label: "Pages CMS", icon: Globe, href: "/pages" },
-    { label: "Curriculum Catalog", icon: BookOpen, href: "/courses" },
+    { label: "Curriculum Catalog", icon: BookOpen, href: "/curriculum-catalog" },
     { label: "Insight Journal", icon: FileEdit, href: "/blogs" },
     { label: "Asset Library", icon: Image, href: "/assets" },
     { label: "Platform Updates", icon: Bell, href: "/updates" },
@@ -55,7 +55,7 @@ const MENU_ITEMS = [
   { group: "Identity & Ops", items: [
     { label: "Staff", icon: ShieldCheck, href: "/staff" },
     { label: "User Access", icon: Users, href: "/users" },
-    { label: "Assessments", icon: Users, href: "/tests" }, // wait, tests can keep its original icon or similar
+    { label: "Assessments", icon: ShieldCheck, href: "/assessments" },
     { label: "Hub Interactions", icon: MessageSquare, href: "/community" },
   ]},
   { group: "Core Engine", items: [
@@ -70,6 +70,7 @@ export function AdminSidebar() {
   const { theme: localTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<any>(null);
+  const [isLoadingUser, setIsLoadingUser] = React.useState(true);
 
   React.useEffect(() => {
     setMounted(true);
@@ -83,7 +84,10 @@ export function AdminSidebar() {
             ...profile
           });
         }
-      } catch (e) {}
+      } catch (e) {
+      } finally {
+        setIsLoadingUser(false);
+      }
     };
     fetchUser();
   }, []);
@@ -145,40 +149,55 @@ export function AdminSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="px-2 py-6 bg-transparent">
-        {filteredMenuItems.map((group) => (
-          <SidebarGroup key={group.group} className="mb-4">
-            <SidebarGroupLabel className="px-4 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-700/80 dark:text-amber-500 group-data-[collapsible=icon]:hidden">
-              {group.group}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <SidebarMenuItem key={item.label}>
-                      <SidebarMenuButton 
-                        asChild 
-                        isActive={isActive}
-                        className={cn(
-                          "transition-all duration-300 rounded-xl h-11 px-4 font-bold text-sm",
-                          isActive 
-                            ? "bg-amber-500/25 text-amber-950 dark:text-yellow-300 border border-amber-500/30 shadow-sm" 
-                            : "text-amber-800/80 hover:text-amber-900 dark:text-yellow-400/80 dark:hover:text-yellow-300 hover:bg-amber-500/10"
-                        )}
-                      >
-                        <NextLink href={item.href}>
-                          <item.icon className={cn("w-4 h-4 text-amber-600 dark:text-yellow-500", isActive ? "text-amber-900 dark:text-yellow-300" : "")} />
-                          <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                          {isActive && <ChevronRight className="ml-auto w-3 h-3 group-data-[collapsible=icon]:hidden text-amber-700 dark:text-yellow-500" />}
-                        </NextLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {isLoadingUser ? (
+          <div className="space-y-6 px-4 animate-pulse">
+            {[1, 2, 3].map((g) => (
+              <div key={g} className="space-y-3">
+                <div className="h-3 w-24 bg-amber-200/50 dark:bg-amber-800/30 rounded" />
+                <div className="space-y-2">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-10 w-full bg-amber-100/50 dark:bg-amber-900/20 rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          filteredMenuItems.map((group) => (
+            <SidebarGroup key={group.group} className="mb-4">
+              <SidebarGroupLabel className="px-4 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-700/80 dark:text-amber-500 group-data-[collapsible=icon]:hidden">
+                {group.group}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton 
+                          asChild 
+                          isActive={isActive}
+                          className={cn(
+                            "transition-all duration-300 rounded-xl h-11 px-4 font-bold text-sm",
+                            isActive 
+                              ? "bg-amber-500/25 text-amber-950 dark:text-yellow-300 border border-amber-500/30 shadow-sm" 
+                              : "text-amber-800/80 hover:text-amber-900 dark:text-yellow-400/80 dark:hover:text-yellow-300 hover:bg-amber-500/10"
+                          )}
+                        >
+                          <NextLink href={item.href}>
+                            <item.icon className={cn("w-4 h-4 text-amber-600 dark:text-yellow-500", isActive ? "text-amber-900 dark:text-yellow-300" : "")} />
+                            <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                            {isActive && <ChevronRight className="ml-auto w-3 h-3 group-data-[collapsible=icon]:hidden text-amber-700 dark:text-yellow-500" />}
+                          </NextLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))
+        )}
       </SidebarContent>
       <SidebarFooter className="p-4 border-t bg-transparent border-amber-200/50 dark:border-amber-500/20">
         <div className="space-y-2">

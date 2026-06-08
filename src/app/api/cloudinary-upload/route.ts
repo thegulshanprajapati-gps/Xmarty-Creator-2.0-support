@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 
+export const dynamic = 'force-dynamic';
+
 const parseCloudinaryUrl = (url: string) => {
   try {
     const parsed = new URL(url);
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
   const { cloudName, apiKey, apiSecret } = parsed;
   const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
   const timestamp = Math.floor(Date.now() / 1000);
-  const signatureParams = resourceType === 'raw' ? `resource_type=raw&timestamp=${timestamp}` : `timestamp=${timestamp}`;
+  const signatureParams = `timestamp=${timestamp}`;
   const signature = createHash('sha1').update(`${signatureParams}${apiSecret}`).digest('hex');
 
   const uploadData = new FormData();

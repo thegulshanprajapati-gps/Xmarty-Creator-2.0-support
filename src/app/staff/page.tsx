@@ -15,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface StaffUser {
   id: string;
@@ -25,9 +27,11 @@ interface StaffUser {
   createdAt: string;
 }
 
-const staffRoles = ['admin', 'editor', 'super_admin'];
+// Fixed role options for Staff Console — exactly these 3 roles
+const STAFF_ROLES = ['admin', 'super_admin', 'editor'] as const;
 
 export default function StaffAdminPage() {
+  const confirm = useConfirm();
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -65,18 +69,15 @@ export default function StaffAdminPage() {
       setError(error.message);
       setStaffList([]);
     } else {
-      // Filter only Admin, Editor, and Super Admin roles
-      const filtered = (data || []).filter((profile: any) => 
-        ['admin', 'super_admin', 'editor'].includes(profile.role)
-      );
-      
+      const profiles = (data || []) as any[];
+      const filtered = profiles.filter((profile) => STAFF_ROLES.includes(profile.role));
       setStaffList(filtered.map((profile: any) => ({
         id: profile.id || profile._id,
         email: profile.email,
-        name: profile.full_name || profile.name || 'Anonymous',
-        phone: profile.phone || 'N/A',
-        role: profile.role || 'admin',
-        createdAt: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A',
+        name: profile.full_name || profile.name || '',
+        phone: profile.phone || '',
+        role: profile.role || '',
+        createdAt: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : '',
       })));
     }
     setLoading(false);
@@ -85,6 +86,14 @@ export default function StaffAdminPage() {
   useEffect(() => {
     fetchCurrentUser();
     fetchStaff();
+
+    const handleInviteTrigger = () => {
+      setShowCreateForm(true);
+    };
+    window.addEventListener('staff-invite', handleInviteTrigger);
+    return () => {
+      window.removeEventListener('staff-invite', handleInviteTrigger);
+    };
   }, []);
 
   const isSuperAdmin = currentUser?.email === 'admin@xmartycreator.com';
@@ -92,7 +101,7 @@ export default function StaffAdminPage() {
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !role || !password) {
-      alert("Name, Email, Password, and Role are required.");
+      toast({ variant: 'destructive', title: 'Validation Error', description: 'Name, Email, Password, and Role are required.' });
       return;
     }
     
@@ -122,7 +131,7 @@ export default function StaffAdminPage() {
       setPassword('');
       setShowCreateForm(false);
       await fetchStaff();
-      alert("Staff member registered successfully!");
+      toast({ title: 'Success', description: 'Staff member registered successfully!' });
     } catch (err: any) {
       setError(err.message || String(err));
     } finally {
@@ -132,7 +141,7 @@ export default function StaffAdminPage() {
 
   const changeRole = async (userId: string, newRole: string) => {
     if (!isSuperAdmin) {
-      alert("Unauthorized. Only the Super Admin (admin@xmartycreator.com) can modify staff roles.");
+      toast({ variant: 'destructive', title: 'Unauthorized', description: 'Only the Super Admin can modify staff roles.' });
       return;
     }
 
@@ -148,11 +157,17 @@ export default function StaffAdminPage() {
 
   const removeStaff = async (userId: string) => {
     if (!isSuperAdmin) {
-      alert("Unauthorized. Only the Super Admin can delete staff members.");
+      toast({ variant: 'destructive', title: 'Unauthorized', description: 'Only the Super Admin can delete staff members.' });
       return;
     }
 
-    if (!confirm('Are you sure you want to remove this staff member?')) return;
+    const isConfirmed = await confirm({
+      title: 'Remove Staff Member',
+      message: 'Are you sure you want to remove this staff member?',
+      confirmText: 'Remove',
+      cancelText: 'Cancel'
+    });
+    if (!isConfirmed) return;
     
     setLoading(true);
     const { error } = await db.from('profiles').delete().eq('id', userId);
@@ -253,9 +268,9 @@ export default function StaffAdminPage() {
                                <SelectValue placeholder="Select Role" />
                              </SelectTrigger>
                              <SelectContent>
-                               {staffRoles.map(r => (
+                               {STAFF_ROLES.map((r) => (
                                  <SelectItem key={r} value={r}>
-                                   {r.replace('_', ' ').toUpperCase()}
+                                   {r.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                  </SelectItem>
                                ))}
                              </SelectContent>
@@ -317,9 +332,9 @@ export default function StaffAdminPage() {
                                <SelectValue />
                              </SelectTrigger>
                              <SelectContent>
-                               {staffRoles.map((r) => (
+                               {STAFF_ROLES.map((r) => (
                                  <SelectItem key={r} value={r}>
-                                   {r.replace('_', ' ').toUpperCase()}
+                                   {r.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                  </SelectItem>
                                ))}
                              </SelectContent>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, Image as ImageIcon, Search } from 'lucide-react';
+import { Loader2, Image as ImageIcon, Search, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface ImagePickerProps {
@@ -77,24 +77,38 @@ export function ImagePicker({ onSelect, trigger }: ImagePickerProps) {
             </div>
           ) : filteredAssets.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredAssets.map(asset => (
-                <div 
-                  key={asset.public_id} 
-                  className="group relative rounded-2xl overflow-hidden border border-border cursor-pointer hover:border-primary transition-all shadow-sm hover:shadow-md"
-                  onClick={() => {
-                    onSelect(asset.secure_url);
-                    setOpen(false);
-                  }}
-                >
-                  <img src={asset.secure_url} alt={asset.public_id} className="h-32 w-full object-cover transition-transform group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                    <Button size="sm" variant="secondary" className="rounded-xl pointer-events-none font-bold">Select</Button>
+              {filteredAssets.map(asset => {
+                const url = (asset.secure_url || '').toLowerCase();
+                const isPdf = url.endsWith('.pdf') || asset.format === 'pdf';
+                
+                return (
+                  <div 
+                    key={asset.public_id} 
+                    className="group relative rounded-2xl overflow-hidden border border-border cursor-pointer hover:border-primary transition-all shadow-sm hover:shadow-md bg-muted/10"
+                    onClick={() => {
+                      onSelect(asset.secure_url);
+                      setOpen(false);
+                    }}
+                  >
+                    {isPdf ? (
+                      <div className="h-32 w-full flex flex-col items-center justify-center gap-2 bg-rose-500/5 text-rose-500 border-b">
+                        <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center shadow-sm">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <span className="text-[9px] uppercase font-black tracking-widest opacity-60">PDF Document</span>
+                      </div>
+                    ) : (
+                      <img src={asset.secure_url} alt={asset.public_id} className="h-32 w-full object-cover transition-transform group-hover:scale-105" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                      <Button size="sm" variant="secondary" className="rounded-xl pointer-events-none font-bold">Select</Button>
+                    </div>
+                    <div className="p-3 bg-background border-t text-xs truncate font-medium">
+                      {asset.public_id.split('/').pop()}
+                    </div>
                   </div>
-                  <div className="p-3 bg-background border-t text-xs truncate font-medium">
-                    {asset.public_id.split('/').pop()}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="h-40 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-2xl">

@@ -24,7 +24,7 @@ export async function getPages(publishedOnly = true): Promise<Page[]> {
     ...doc,
     id: doc._id.toString(),
     _id: undefined
-  })) as Page[];
+  } as any)) as Page[];
 }
 
 export async function getPageBySlug(slug: string): Promise<Page | null> {
@@ -35,7 +35,7 @@ export async function getPageBySlug(slug: string): Promise<Page | null> {
     ...doc,
     id: doc._id.toString(),
     _id: undefined
-  } as Page;
+  } as any as Page;
 }
 
 export async function upsertPage(payload: Partial<Page>): Promise<Page> {

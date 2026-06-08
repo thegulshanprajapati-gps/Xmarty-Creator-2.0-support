@@ -21,7 +21,7 @@ export async function getUpdates(publishedOnly = true): Promise<Update[]> {
     ...doc,
     id: doc._id.toString(),
     _id: undefined
-  })) as Update[];
+  } as any)) as Update[];
 }
 
 export async function getUpdateBySlug(slug: string): Promise<Update | null> {
@@ -32,7 +32,7 @@ export async function getUpdateBySlug(slug: string): Promise<Update | null> {
     ...doc,
     id: doc._id.toString(),
     _id: undefined
-  } as Update;
+  } as any as Update;
 }
 
 export async function upsertUpdate(payload: Partial<Update>): Promise<Update> {

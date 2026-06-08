@@ -85,7 +85,7 @@ class MongoQueryBuilder {
   }
 
   delete() {
-    this.pendingAction = 'deleteOne';
+    this.pendingAction = 'deleteMany';
     return this;
   }
 

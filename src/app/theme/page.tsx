@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Palette, Save, Sun, Moon } from "lucide-react";
+import { Palette, Save, Sun, Moon, Upload, Trash2, Type, Check, RefreshCcw } from "lucide-react";
 import { useCMS } from "@/components/cms-provider";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SavingOverlay } from "@/components/saving-overlay";
 import { db } from "@/lib/db";
+import { GOOGLE_FONTS_LIST } from "@/lib/font-list";
 
 function hexToHSL(hex: string): string {
   let r = 0, g = 0, b = 0;
@@ -46,7 +47,7 @@ function hexToHSL(hex: string): string {
 }
 
 export default function ThemeSettings() {
-  const { settings, refreshSettings } = useCMS();
+  const { settings, customFonts, refreshSettings, refreshFonts } = useCMS();
   const { toast } = useToast();
   
   const [primary, setPrimary] = useState("231 48% 48%");
@@ -54,10 +55,21 @@ export default function ThemeSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
 
+  // Typography state
+  const [headingsFont, setHeadingsFont] = useState("Space Grotesk");
+  const [bodyFont, setBodyFont] = useState("Inter");
+
+  // Font upload state
+  const [fontFile, setFontFile] = useState<File | null>(null);
+  const [fontName, setFontName] = useState("");
+  const [isUploadingFont, setIsUploadingFont] = useState(false);
+
   useEffect(() => {
     if (settings) {
       if (settings.primaryColor) setPrimary(settings.primaryColor);
       if (settings.themeMode) setThemeMode(settings.themeMode);
+      if (settings.headings_font) setHeadingsFont(settings.headings_font);
+      if (settings.body_font) setBodyFont(settings.body_font);
     }
   }, [settings]);
 
@@ -81,6 +93,8 @@ export default function ThemeSettings() {
         primary_color: primary,
         secondary_color: primary,
         theme_settings: { themeMode },
+        headings_font: headingsFont,
+        body_font: bodyFont,
       };
 
       const response = settings?.id
@@ -94,7 +108,7 @@ export default function ThemeSettings() {
       await refreshSettings();
       toast({
         title: 'Saved',
-        description: 'Brand settings synchronized to Supabase.',
+        description: 'Brand typography and theme configurations synchronized successfully.',
       });
     } catch (error) {
       toast({
@@ -108,11 +122,106 @@ export default function ThemeSettings() {
         setTimeout(() => setIsSaving(false), 600);
       }, 1500);
     }
-  }, [primary, refreshSettings, settings?.id, settings?.siteName, themeMode, toast]);
+  }, [primary, refreshSettings, settings?.id, settings?.siteName, themeMode, headingsFont, bodyFont, toast]);
+
+  const handleFontFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setFontFile(file);
+    if (file && !fontName) {
+      // Auto-populate font name from file name
+      const name = file.name.substring(0, file.name.lastIndexOf('.'));
+      setFontName(name.replace(/[-_]/g, ' '));
+    }
+  };
+
+  const handleUploadFont = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fontFile || !fontName.trim()) return;
+
+    setIsUploadingFont(true);
+    const formData = new FormData();
+    formData.append("file", fontFile);
+    formData.append("name", fontName.trim());
+
+    try {
+      const res = await fetch("/api/fonts", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to upload font.");
+      }
+
+      toast({
+        title: "Font Uploaded",
+        description: `Custom font "${fontName}" has been successfully added.`,
+      });
+
+      setFontFile(null);
+      setFontName("");
+      // Reset input element
+      const fileInput = document.getElementById("font-file-input") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+
+      await refreshFonts();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Upload Failed",
+        description: err.message || "An error occurred during upload.",
+      });
+    } finally {
+      setIsUploadingFont(false);
+    }
+  };
+
+  const handleDeleteFont = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete custom font "${name}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/fonts?id=${id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete font.");
+      }
+
+      toast({
+        title: "Font Deleted",
+        description: `Font "${name}" removed successfully.`,
+      });
+
+      await refreshFonts();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Deletion Failed",
+        description: err.message || "An error occurred.",
+      });
+    }
+  };
+
+  // Combine standard google fonts with uploaded custom fonts
+  const allFontsList = [
+    ...GOOGLE_FONTS_LIST,
+    ...(customFonts || []).map((f) => f.name),
+  ].sort((a, b) => a.localeCompare(b));
 
   return (
     <SidebarProvider>
-      <SavingOverlay isVisible={isSaving} progress={saveProgress} message="Orchestrating Brand Identity" />
+      <SavingOverlay 
+        isVisible={isSaving} 
+        status={saveProgress === 100 ? 'success' : 'saving'} 
+        progress={saveProgress}
+        title="Saving Theme Settings"
+        description="Applying brand colors & custom fonts..."
+        successTitle="Successfully Saved Theme!"
+        successDescription="Global branding settings updated successfully."
+      />
       <AdminSidebar />
       <SidebarInset className="max-w-full">
         <header className="flex h-16 shrink-0 items-center gap-4 border-b bg-background px-6 sticky top-0 z-50">
@@ -136,6 +245,7 @@ export default function ThemeSettings() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Color Accent Card */}
             <Card className="border-primary/10 shadow-xl rounded-[2rem] overflow-hidden bg-card transition-all hover:border-primary/30">
               <CardHeader className="bg-muted/30">
                 <CardTitle className="text-lg font-headline font-bold">Brand Pulse Color</CardTitle>
@@ -170,6 +280,7 @@ export default function ThemeSettings() {
               </CardContent>
             </Card>
 
+            {/* Atmosphere Card */}
             <Card className="border-primary/10 shadow-xl rounded-[2rem] overflow-hidden bg-card transition-all hover:border-primary/30">
               <CardHeader className="bg-muted/30">
                 <CardTitle className="text-lg font-headline font-bold">Atmosphere</CardTitle>
@@ -201,6 +312,149 @@ export default function ThemeSettings() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Typography Engine Config Card */}
+          <Card className="border-primary/10 shadow-xl rounded-[2rem] overflow-hidden bg-card transition-all hover:border-primary/30">
+            <CardHeader className="bg-muted/30">
+              <CardTitle className="text-lg font-headline font-bold">Typography Hierarchy Engine</CardTitle>
+              <CardDescription className="text-xs uppercase tracking-widest font-bold">Select body and headings fonts across the whole platform.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="font-bold text-sm">Headings Font Family</Label>
+                  <select
+                    value={headingsFont}
+                    onChange={(e) => setHeadingsFont(e.target.value)}
+                    className="w-full h-12 rounded-xl bg-background border border-primary/10 px-4 focus:outline-none focus:ring-2 focus:ring-primary font-bold text-foreground"
+                  >
+                    {allFontsList.map((font) => (
+                      <option key={font} value={font}>{font}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="font-bold text-sm">Body Font Family</Label>
+                  <select
+                    value={bodyFont}
+                    onChange={(e) => setBodyFont(e.target.value)}
+                    className="w-full h-12 rounded-xl bg-background border border-primary/10 px-4 focus:outline-none focus:ring-2 focus:ring-primary font-bold text-foreground"
+                  >
+                    {allFontsList.map((font) => (
+                      <option key={font} value={font}>{font}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Real-time preview */}
+              <div className="border border-dashed border-primary/20 p-6 rounded-2xl bg-muted/5 space-y-3 mt-6">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Typography Pulse Preview</span>
+                <h3 
+                  className="text-2xl font-bold transition-all duration-300"
+                  style={{ fontFamily: `'${headingsFont}', sans-serif` }}
+                >
+                  This is your dynamic headings typography
+                </h3>
+                <p 
+                  className="text-sm text-muted-foreground leading-relaxed transition-all duration-300"
+                  style={{ fontFamily: `'${bodyFont}', sans-serif` }}
+                >
+                  This is your body text font preview. Standard paragraphs, lists, descriptions, and dynamic widgets will render using this typeface, fully synchronized.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Custom Font Uploader and List Manager Card */}
+          <Card className="border-primary/10 shadow-xl rounded-[2rem] overflow-hidden bg-card transition-all hover:border-primary/30">
+            <CardHeader className="bg-muted/30">
+              <CardTitle className="text-lg font-headline font-bold">Custom Font Upload Center</CardTitle>
+              <CardDescription className="text-xs uppercase tracking-widest font-bold">Add and manage TTF, OTF, WOFF, or WOFF2 custom font files.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 space-y-6">
+              <form onSubmit={handleUploadFont} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                <div className="space-y-2">
+                  <Label className="font-bold text-sm">Font File</Label>
+                  <Input 
+                    id="font-file-input"
+                    type="file"
+                    accept=".ttf,.otf,.woff,.woff2"
+                    onChange={handleFontFileChange}
+                    className="h-12 rounded-xl flex items-center pt-2 text-xs"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-bold text-sm">Font Family Name</Label>
+                  <Input 
+                    type="text"
+                    value={fontName}
+                    onChange={(e) => setFontName(e.target.value)}
+                    placeholder="e.g. Arizonia"
+                    className="h-12 rounded-xl font-bold"
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  disabled={isUploadingFont || !fontFile || !fontName}
+                  className="h-12 rounded-xl font-bold w-full bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md transition-all"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {isUploadingFont ? "Uploading..." : "Upload Font"}
+                </Button>
+              </form>
+
+              {/* Uploaded fonts list */}
+              <div className="space-y-4 pt-6 border-t border-primary/5">
+                <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Type className="h-4 w-4 text-primary" />
+                  Uploaded Custom Fonts ({customFonts?.length || 0})
+                </h4>
+
+                {!customFonts || customFonts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic py-4">No custom fonts uploaded yet. Upload your TTF/OTF/WOFF files above.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {customFonts.map((font) => (
+                      <div 
+                        key={font.id} 
+                        className="flex items-center justify-between p-4 border border-primary/5 rounded-2xl bg-muted/10 hover:bg-muted/20 hover:border-primary/20 transition-all"
+                      >
+                        <div className="space-y-1.5 flex-1 pr-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-base text-foreground">{font.name}</span>
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 border-none bg-primary/10 text-primary uppercase font-bold">
+                              {font.format}
+                            </Badge>
+                          </div>
+                          {/* Live preview in list */}
+                          <p 
+                            className="text-lg py-1 border-t border-dashed border-primary/5 mt-2" 
+                            style={{ fontFamily: `'${font.name}', sans-serif` }}
+                          >
+                            Quick brown fox jumps over the lazy dog.
+                          </p>
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDeleteFont(font.id, font.name)}
+                          className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl"
+                          title="Delete Custom Font"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </main>
       </SidebarInset>
     </SidebarProvider>

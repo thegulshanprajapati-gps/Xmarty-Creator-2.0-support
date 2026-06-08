@@ -13,7 +13,7 @@ import { useCmsPage } from "@/hooks/use-cms-page";
 
 export default function CmsEditPage() {
   const params = useParams();
-  const slug = params?.slug;
+  const slug = typeof params?.slug === 'string' ? params.slug : (Array.isArray(params?.slug) ? params.slug[0] : undefined);
   const router = useRouter();
   const { page, loading, error, save, reload } = useCmsPage(slug);
   const [title, setTitle] = useState('');
