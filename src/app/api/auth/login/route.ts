@@ -19,9 +19,8 @@ import type { UserRole } from '@/lib/rbac';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
-const DOMAIN = 'supportdomain' as const;
-const SUPERADMIN_EMAIL = 'admin@xmartycreator.com';
-const SUPERADMIN_PASS = process.env.SUPERADMIN_PASSWORD || 'XmartyAdmin2024!';
+const SUPERADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || process.env.ADMIN_EMAIL;
+const SUPERADMIN_PASS = process.env.SUPERADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
 export async function POST(req: NextRequest) {
   const ip =
