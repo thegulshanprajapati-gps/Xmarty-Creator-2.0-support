@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { ContextMenu } from "@/components/admin/context-menu";
 import { ImagePicker } from "@/components/admin/image-picker";
+import { db } from "@/lib/db";
 
 // Windows-style folder icon
 export function WindowsFolderIcon({ className = "h-12 w-12" }: { className?: string }) {
@@ -85,6 +86,8 @@ export interface ExplorerItem {
   description?: string;
   visibility?: string;
   slug?: string;
+  studentId?: string | null;
+  approved?: boolean;
 }
 
 interface WindowsExplorerProps {
@@ -106,6 +109,7 @@ interface WindowsExplorerProps {
     description?: string;
     thumbnailUrl?: string;
     visibility?: string;
+    slug?: string;
   }) => Promise<any>;
   onEditCourse?: (item: ExplorerItem) => void;
   onAdvanceEdit?: (item: ExplorerItem) => void;
@@ -150,6 +154,79 @@ export function WindowsExplorer({
   const [dragBox, setDragBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const startPos = useRef<{ x: number; y: number } | null>(null);
 
+  // Student Enrollment and Profile States
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [enrollTarget, setEnrollTarget] = useState<ExplorerItem | null>(null);
+  const [availableCourses, setAvailableCourses] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCourseName, setSelectedCourseName] = useState("");
+  const [enrolling, setEnrolling] = useState(false);
+
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileTarget, setProfileTarget] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  const openEnrollDialog = async (item: ExplorerItem) => {
+    setEnrollTarget(item);
+    setEnrollDialogOpen(true);
+    setSelectedCourseName("");
+    try {
+      const { data } = await db.from('course_folders').select('*').eq('parent_folder_id', null);
+      if (data) {
+        const courses = data
+          .filter((c: any) => c.course_id !== 'assessments')
+          .map((c: any) => ({ id: c.id, name: c.title }));
+        setAvailableCourses(courses);
+        if (courses.length > 0) {
+          setSelectedCourseName(courses[0].name);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleEnrollSubmit = async () => {
+    if (!enrollTarget?.studentId || !selectedCourseName) return;
+    setEnrolling(true);
+    try {
+      const { data: profile, error: fetchErr } = await db.from('profiles').select('*').eq('id', enrollTarget.studentId).single();
+      if (fetchErr) throw fetchErr;
+
+      const enrolled = profile?.enrolled_courses || [];
+      if (!enrolled.includes(selectedCourseName)) {
+        enrolled.push(selectedCourseName);
+      }
+
+      const { error: updateErr } = await db.from('profiles').update({ enrolled_courses: enrolled }).eq('id', enrollTarget.studentId);
+      if (updateErr) throw updateErr;
+
+      alert(`Successfully enrolled student in "${selectedCourseName}"!`);
+      setEnrollDialogOpen(false);
+      window.location.reload();
+    } catch (e: any) {
+      alert(`Enrollment failed: ${e.message || String(e)}`);
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  const openProfileDialog = async (item: ExplorerItem) => {
+    if (!item.studentId) return;
+    setProfileTarget(null);
+    setProfileDialogOpen(true);
+    setProfileLoading(true);
+    try {
+      const { data, error } = await db.from('profiles').select('*').eq('id', item.studentId).single();
+      if (!error && data) {
+        setProfileTarget(data);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   // Modals / Actions
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -183,6 +260,24 @@ export function WindowsExplorer({
 
   // Theme State
   const [isDarkTheme, setIsDarkTheme] = useState(true);
+  const [userRole, setUserRole] = useState<string>('');
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const { data: { user } } = await db.auth.getUser();
+        if (user) {
+          const { data: profile } = await db.from('profiles').select('*').eq('email', user.email).single();
+          if (profile?.role) {
+            setUserRole(profile.role);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load user role", err);
+      }
+    };
+    fetchUserRole();
+  }, []);
 
   // Initialize theme from global settings
   useEffect(() => {
@@ -296,29 +391,26 @@ export function WindowsExplorer({
         return;
       }
 
-      const rect = container.getBoundingClientRect();
-      const startX = e.clientX - rect.left + container.scrollLeft;
-      const startY = e.clientY - rect.top + container.scrollTop;
-
-      startPos.current = { x: startX, y: startY };
-      setDragBox({ x: startX, y: startY, w: 0, h: 0 });
+      startPos.current = { x: e.clientX, y: e.clientY };
+      setDragBox({ x: 0, y: 0, w: 0, h: 0 });
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!startPos.current) return;
 
+      const x = Math.min(startPos.current.x, e.clientX);
+      const y = Math.min(startPos.current.y, e.clientY);
+      const w = Math.abs(startPos.current.x - e.clientX);
+      const h = Math.abs(startPos.current.y - e.clientY);
+
+      // Convert screen-space box to container-relative coordinate system for drawing the drag border box
       const rect = container.getBoundingClientRect();
-      const currentX = e.clientX - rect.left + container.scrollLeft;
-      const currentY = e.clientY - rect.top + container.scrollTop;
+      const relativeX = x - rect.left + container.scrollLeft;
+      const relativeY = y - rect.top + container.scrollTop;
 
-      const x = Math.min(startPos.current.x, currentX);
-      const y = Math.min(startPos.current.y, currentY);
-      const w = Math.abs(startPos.current.x - currentX);
-      const h = Math.abs(startPos.current.y - currentY);
+      setDragBox({ x: relativeX, y: relativeY, w, h });
 
-      setDragBox({ x, y, w, h });
-
-      // Determine overlapping cards
+      // Determine overlapping cards using screen space positions
       const cards = container.querySelectorAll('.explorer-item-card');
       const selected: string[] = [];
 
@@ -327,16 +419,13 @@ export function WindowsExplorer({
         const id = el.getAttribute('data-id');
         if (!id) return;
 
-        const cardLeft = el.offsetLeft;
-        const cardTop = el.offsetTop;
-        const cardWidth = el.offsetWidth;
-        const cardHeight = el.offsetHeight;
+        const cardRect = el.getBoundingClientRect();
 
         const isOverlapping =
-          x < cardLeft + cardWidth &&
-          x + w > cardLeft &&
-          y < cardTop + cardHeight &&
-          y + h > cardTop;
+          x < cardRect.right &&
+          x + w > cardRect.left &&
+          y < cardRect.bottom &&
+          y + h > cardRect.top;
 
         if (isOverlapping) {
           selected.push(id);
@@ -842,6 +931,17 @@ export function WindowsExplorer({
               <HardDrive className="h-4.5 w-4.5 text-sky-400 shrink-0" />
               <span>{rootName} Root</span>
             </div>
+            
+            {/* Recycle Bin Link */}
+            <a
+              href="/recycle-bin"
+              className={cn(
+                "flex items-center gap-2 py-1 px-2 rounded cursor-pointer text-xs transition-colors text-rose-400 hover:bg-neutral-800/50"
+              )}
+            >
+              <Trash2 className="h-4.5 w-4.5 text-rose-400 shrink-0" />
+              <span>Recycle Bin</span>
+            </a>
           </div>
 
           {/* Directory Tree */}
@@ -959,16 +1059,23 @@ export function WindowsExplorer({
                     </span>
 
                     {/* Folder Badges (like Access Free/Paid) */}
-                    {item.isPaid !== undefined && (
-                      <span className={cn(
-                        "mt-1 text-[8px] font-bold px-1.5 py-0.2 rounded-full border shrink-0",
-                        item.isPaid 
-                          ? "bg-amber-950/40 text-amber-400 border-amber-800/30"
-                          : "bg-emerald-950/40 text-emerald-400 border-emerald-800/30"
-                      )}>
-                        {item.isPaid ? "Paid" : "Free"}
-                      </span>
-                    )}
+                    <div className="flex gap-1 flex-wrap justify-center mt-1">
+                      {item.isPaid !== undefined && (
+                        <span className={cn(
+                          "text-[8px] font-bold px-1.5 py-0.2 rounded-full border shrink-0",
+                          item.isPaid 
+                            ? "bg-amber-950/40 text-amber-400 border-amber-800/30"
+                            : "bg-emerald-950/40 text-emerald-400 border-emerald-800/30"
+                        )}>
+                          {item.isPaid ? "Paid" : "Free"}
+                        </span>
+                      )}
+                      {item.type === 'folder' && !item.parentId && item.approved === false && (
+                        <span className="text-[8px] font-bold px-1.5 py-0.2 rounded-full border shrink-0 bg-rose-950/40 text-rose-400 border-rose-800/30">
+                          Pending
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -1328,6 +1435,38 @@ export function WindowsExplorer({
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           options={[
+            ...(contextMenu.item.type === 'folder' && contextMenu.item.studentId ? [
+              {
+                label: '🎓 Enroll into Course',
+                onClick: () => {
+                  openEnrollDialog(contextMenu.item);
+                  setContextMenu(null);
+                },
+                className: 'text-emerald-600 dark:text-emerald-400 font-bold',
+              },
+              {
+                label: '👤 View Student Profile',
+                onClick: () => {
+                  openProfileDialog(contextMenu.item);
+                  setContextMenu(null);
+                },
+                className: 'text-sky-600 dark:text-sky-400 font-bold',
+              }
+            ] : []),
+            ...(contextMenu.item.type === 'folder' && !contextMenu.item.parentId && isCatalog && contextMenu.item.approved === false && (userRole === 'admin' || userRole === 'super_admin' || userRole === 'superadmin' || userRole === 'support' || userRole === 'staff') ? [{
+              label: '✅ Approve Course',
+              onClick: async () => {
+                const res = await db.from('course_folders').update({ approved: true }).eq('id', contextMenu.item.id);
+                setContextMenu(null);
+                if (res.error) {
+                  alert(`Failed to approve course: ${res.error.message}`);
+                } else {
+                  alert('Course has been approved and is now live!');
+                  setTimeout(() => window.location.reload(), 1200);
+                }
+              },
+              className: 'text-emerald-600 dark:text-emerald-400 font-extrabold',
+            }] : []),
             ...(contextMenu.item.type === 'folder' && !contextMenu.item.parentId && isCatalog && onAdvanceEdit ? [{
               label: '🚀 Advance Edit',
               onClick: () => {
@@ -1345,16 +1484,39 @@ export function WindowsExplorer({
               className: 'text-blue-600 dark:text-blue-400 font-bold',
             }] : []),
             {
-              label: '📂 Open',
+              label: contextMenu.item.type === 'folder' ? '📂 Open' : '📄 Open File',
               onClick: () => {
                 window.dispatchEvent(new CustomEvent('explorer-open-item', { detail: { id: contextMenu.item.id, type: contextMenu.item.type } }));
                 setContextMenu(null);
               },
             },
+            ...(contextMenu.item.type === 'folder' && onCreateFolder ? [{
+              label: '📁 New Subfolder',
+              onClick: () => {
+                // Navigate into folder first, then open create dialog
+                navigateTo(contextMenu.item.id);
+                setContextMenu(null);
+                setTimeout(() => setCreateDialogOpen(true), 100);
+              },
+            }] : []),
             ...(onRenameItem ? [{
               label: '✏️ Rename',
               onClick: () => {
                 window.dispatchEvent(new CustomEvent('explorer-rename-item', { detail: { id: contextMenu.item.id } }));
+                setContextMenu(null);
+              },
+            }] : []),
+            {
+              label: '📋 Copy Name',
+              onClick: () => {
+                navigator.clipboard.writeText(contextMenu.item.name).catch(() => {});
+                setContextMenu(null);
+              },
+            },
+            ...(contextMenu.item.url ? [{
+              label: '🔗 Copy Link',
+              onClick: () => {
+                navigator.clipboard.writeText(contextMenu.item.url!).catch(() => {});
                 setContextMenu(null);
               },
             }] : []),
@@ -1376,6 +1538,104 @@ export function WindowsExplorer({
           ]}
         />
       )}
+
+      {/* Enroll Student into Course Dialog */}
+      <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
+        <DialogContent className={cn(
+          "border rounded-xl",
+          isDarkTheme ? "bg-[#1e1e1e] border-neutral-800 text-neutral-200" : "bg-white border-neutral-200 text-neutral-800"
+        )}>
+          <DialogHeader>
+            <DialogTitle>Enroll {enrollTarget?.name} into Course</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-1">
+              <Label className={cn("text-xs", isDarkTheme ? "text-neutral-400" : "text-neutral-500")}>Select Course</Label>
+              <Select value={selectedCourseName} onValueChange={setSelectedCourseName}>
+                <SelectTrigger className={cn(
+                  "h-10",
+                  isDarkTheme ? "bg-[#2d2d2d] border-neutral-700 text-white" : "bg-white border-neutral-300 text-neutral-900"
+                )}>
+                  <SelectValue placeholder="Choose course..." />
+                </SelectTrigger>
+                <SelectContent className={isDarkTheme ? "bg-[#1e1e1e] border-neutral-800 text-white" : "bg-white border-neutral-200 text-neutral-900"}>
+                  {availableCourses.map((c) => (
+                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                  ))}
+                  {availableCourses.length === 0 && (
+                    <SelectItem value="none" disabled>No courses available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="ghost" 
+              className={cn(isDarkTheme ? "text-neutral-400 hover:bg-neutral-800" : "text-neutral-600 hover:bg-neutral-100")} 
+              onClick={() => setEnrollDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button className="bg-[#0078d7] hover:bg-[#0078d7]/90 text-white font-bold" onClick={handleEnrollSubmit} disabled={enrolling || availableCourses.length === 0}>
+              {enrolling ? "Enrolling..." : "Enroll Student"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Student Profile Details Dialog */}
+      <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+        <DialogContent className={cn(
+          "border rounded-xl max-w-md",
+          isDarkTheme ? "bg-[#1e1e1e] border-neutral-800 text-neutral-200" : "bg-white border-neutral-200 text-neutral-800"
+        )}>
+          <DialogHeader>
+            <DialogTitle>Student Profile Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-3 text-sm">
+            {profileLoading ? (
+              <div className="text-center py-6">Loading profile...</div>
+            ) : profileTarget ? (
+              <div className="space-y-3">
+                <div className="flex justify-between border-b border-neutral-700/20 pb-2">
+                  <span className="font-bold">Name:</span>
+                  <span>{profileTarget.full_name || 'Anonymous'}</span>
+                </div>
+                <div className="flex justify-between border-b border-neutral-700/20 pb-2">
+                  <span className="font-bold">Email:</span>
+                  <span className="font-mono">{profileTarget.email}</span>
+                </div>
+                <div className="flex justify-between border-b border-neutral-700/20 pb-2">
+                  <span className="font-bold">Role:</span>
+                  <span className="capitalize">{profileTarget.role || 'student'}</span>
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  <span className="font-bold block">Enrolled Courses:</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {profileTarget.enrolled_courses && profileTarget.enrolled_courses.length > 0 ? (
+                      profileTarget.enrolled_courses.map((c: string, idx: number) => (
+                        <span key={idx} className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none px-2 py-0.5 rounded-full text-[10px] font-bold">
+                          {c}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-neutral-500 italic">No enrolled courses</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-rose-500">Failed to load student profile.</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button className="bg-[#0078d7] hover:bg-[#0078d7]/90 text-white font-bold" onClick={() => setProfileDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -600,24 +600,22 @@ export default function CoursesAdminPage() {
         {/* Split Layout: FolderManager + Editor Panel */}
         <div className="flex flex-1 min-h-0 overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
           {/* Left: Folder Manager */}
-          <div
-            className={`flex-1 overflow-auto p-6 md:p-8 transition-all duration-300 ${
-              (editingCourse || advancingCourse) ? 'lg:max-w-[55%]' : 'w-full'
-            }`}
-          >
-            <FolderManager
-              key={refreshKey}
-              courseId="default"
-              title="Course Curriculum"
-              description="Organize course content into folders, modules, and media bundles."
-              onEditCourse={handleEditCourse}
-              onAdvanceEdit={handleAdvanceEdit}
-            />
-          </div>
+          {!(editingCourse || advancingCourse) && (
+            <div className="flex-1 overflow-auto p-6 md:p-8 w-full">
+              <FolderManager
+                key={refreshKey}
+                courseId="default"
+                title="Course Curriculum"
+                description="Organize course content into folders, modules, and media bundles."
+                onEditCourse={handleEditCourse}
+                onAdvanceEdit={handleAdvanceEdit}
+              />
+            </div>
+          )}
 
           {/* Right: Basic Course Editor Panel */}
           {editingCourse && !advancingCourse && (
-            <div className="w-full lg:w-[45%] min-w-0 border-l bg-background shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
+            <div className="w-full min-w-0 bg-background flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
               <CourseEditor
                 course={editingCourse}
                 onClose={handleEditorClose}
@@ -628,7 +626,7 @@ export default function CoursesAdminPage() {
 
           {/* Right: Advanced Course Editor Panel */}
           {advancingCourse && !editingCourse && (
-            <div className="w-full lg:w-[45%] min-w-0 border-l bg-background shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
+            <div className="w-full min-w-0 bg-background flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-300">
               <AdvancedCourseEditor
                 course={advancingCourse}
                 onClose={handleEditorClose}

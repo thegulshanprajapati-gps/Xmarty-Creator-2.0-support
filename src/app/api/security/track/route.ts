@@ -1,10 +1,30 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
+import { verifyToken } from '@/lib/auth-token';
+import { parseCookies } from '@/lib/csrf';
+import { COOKIE_ACCESS_TOKEN } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const cookieHeader = req.headers.get('cookie');
+    const cookies = parseCookies(cookieHeader);
+    const accessToken = cookies[COOKIE_ACCESS_TOKEN];
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const tokenResult = verifyToken(accessToken, 'access');
+    if (!tokenResult.valid) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userRole = tokenResult.payload.role;
+    if (userRole !== 'super_admin' && userRole !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
     const db = await getDb();
     const logs = await db.collection('security_logs')
       .find({})

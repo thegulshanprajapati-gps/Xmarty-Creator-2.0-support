@@ -4,6 +4,15 @@ import { CMSProvider } from "@/components/cms-provider";
 import { ClientLayoutShell } from "@/components/client-layout-shell";
 import { getDb } from '@/lib/mongodb';
 
+export const metadata: Metadata = {
+  title: {
+    default: "Support Console",
+    template: "%s | Support Console"
+  },
+  description: "XmartyCreator Administrative Support Console.",
+  robots: { index: false, follow: false }
+};
+
 const defaultSettings = {
   themeMode: 'light',
   primaryColor: '#FF0000',

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AdminSidebar } from '@/components/admin/sidebar';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -19,67 +18,69 @@ interface ConnectionStatus {
   envVars: string[];
   tips: string[];
   action?: string;
+  latency?: number;
 }
 
 const connections: ConnectionStatus[] = [
   {
-    name: 'Supabase API',
-    status: 'connected',
+    name: 'MongoDB Atlas',
+    status: 'disconnected',
+    service: 'mongodb',
+    description: 'Primary Document Database containing profiles, assessments, course structures, and system telemetry.',
+    config: 'mongodb+srv://xmartydb.mongodb.net/xmartycreator',
+    envVars: ['MONGODB_URI'],
+    tips: [
+      'Check MONGODB_URI starts with mongodb+srv://',
+      'Ensure IP access list in MongoDB Atlas dashboard permits connection from your web host',
+      'Verify user credentials inside the URI are correct',
+    ],
+  },
+  {
+    name: 'Supabase Engine',
+    status: 'disconnected',
     service: 'supabase',
-    description: 'Cloud database and authentication service',
-    config: 'https://sibaltmusbhcbelgtnli.db.co',
+    description: 'Supplemental authentication and cloud relational database cluster.',
+    config: 'https://sibaltmusbhcbelgtnli.supabase.co',
     envVars: ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'],
     tips: [
-      'Verify NEXT_PUBLIC_SUPABASE_URL matches your Supabase project URL',
-      'Ensure NEXT_PUBLIC_SUPABASE_ANON_KEY is set (public anon key from Supabase settings)',
-      'Check that your Supabase project is active and not paused',
-      'Verify network connectivity to db.co domain',
+      'Ensure NEXT_PUBLIC_SUPABASE_URL is correct',
+      'Confirm NEXT_PUBLIC_SUPABASE_ANON_KEY matches your dashboard settings',
     ],
   },
   {
-    name: 'Supabase Database',
-    status: 'disconnected',
-    service: 'database',
-    description: 'PostgreSQL database connection',
-    config: 'db.sibaltmusbhcbelgtnli.db.co:5432',
-    envVars: ['DATABASE_URL'],
-    tips: [
-      'Set DATABASE_URL: postgresql://postgres:password@db.host:5432/postgres',
-      'Ensure Session Pooler is enabled if on IPv4 network',
-      'Verify database credentials are correct',
-      'Check firewall rules allow connections to port 5432',
-      'Test connection: psql postgresql://user:pass@host:5432/postgres',
-    ],
-    action: 'connect-db',
-  },
-  {
-    name: 'Cloudinary',
+    name: 'Cloudinary CDN',
     status: 'disconnected',
     service: 'cloudinary',
-    description: 'Image upload and management',
-    config: 'Not configured',
+    description: 'Cloud storage and dynamic delivery system for image uploads, PDF attachments, and video assets.',
+    config: 'cloudinary://xmartycreator',
     envVars: ['NEXT_PUBLIC_CLOUDINARY_URL', 'NEXT_PUBLIC_CLOUDINARY_GALLERY_URL'],
     tips: [
-      'Create a Cloudinary account at cloudinary.com',
-      'Get your cloud name, API key, and API secret',
-      'Set NEXT_PUBLIC_CLOUDINARY_URL with your credentials',
-      'Configure NEXT_PUBLIC_CLOUDINARY_GALLERY_URL for public gallery access',
-      'Test upload via supportdomain/assets page',
+      'Ensure NEXT_PUBLIC_CLOUDINARY_URL starts with cloudinary://',
+      'Test image asset picking inside course editor',
     ],
-    action: 'connect-cloudinary',
   },
   {
-    name: 'Firebase (Legacy)',
-    status: 'warning',
+    name: 'Firebase Services',
+    status: 'disconnected',
     service: 'firebase',
-    description: 'Previous authentication backend (being replaced)',
-    config: 'Deprecated',
+    description: 'Legacy web app configuration for authentication state synchronizations.',
+    config: 'firebase-config-json',
     envVars: ['NEXT_PUBLIC_FIREBASE_CONFIG'],
     tips: [
-      'This service is being migrated to Supabase',
-      'Existing Firebase credentials can remain in .env for backwards compatibility',
-      'New features will use Supabase only',
-      'Plan migration of Firebase data to Supabase',
+      'Used for backward compatibility auth logic',
+      'Must contain a valid stringified JSON structure',
+    ],
+  },
+  {
+    name: 'Gemini AI Processor',
+    status: 'disconnected',
+    service: 'gemini',
+    description: 'Advanced Large Language Model engine handling SEO suggestions and curriculum generation.',
+    config: 'gemini-2.5-flash',
+    envVars: ['GEMINI_API_KEY'],
+    tips: [
+      'Obtain API Key from Google AI Studio',
+      'Ensure key is not restricted or expired',
     ],
   },
 ];
@@ -104,23 +105,31 @@ export default function ConnectionsPage() {
         body: JSON.stringify({ service }),
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (response.ok && data.status === 'connected') {
         setStatuses((prev) =>
           prev.map((s) =>
-            s.service === service ? { ...s, status: 'connected' } : s
+            s.service === service ? { ...s, status: 'connected', latency: data.latency } : s
+          )
+        );
+      } else if (response.ok && data.status === 'warning') {
+        setStatuses((prev) =>
+          prev.map((s) =>
+            s.service === service ? { ...s, status: 'warning', latency: data.latency } : s
           )
         );
       } else {
         setStatuses((prev) =>
           prev.map((s) =>
-            s.service === service ? { ...s, status: 'disconnected' } : s
+            s.service === service ? { ...s, status: 'disconnected', latency: undefined } : s
           )
         );
       }
     } catch (error) {
       setStatuses((prev) =>
         prev.map((s) =>
-          s.service === service ? { ...s, status: 'disconnected' } : s
+          s.service === service ? { ...s, status: 'disconnected', latency: undefined } : s
         )
       );
     } finally {
@@ -172,7 +181,6 @@ export default function ConnectionsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {/* Client-only last-checked display to avoid server/client hydration mismatch */}
               <Badge variant="outline">
                 Last checked: {isMounted ? <span>{new Date(lastUpdated).toLocaleTimeString()}</span> : <span>—</span>}
               </Badge>
@@ -210,23 +218,29 @@ export default function ConnectionsPage() {
                         </CardDescription>
                       </div>
                     </div>
-                    <Badge
-                      className="uppercase text-xs font-bold"
-                      variant={
-                        connection.status === 'connected'
-                          ? 'default'
-                          : connection.status === 'warning'
-                          ? 'secondary'
-                          : 'destructive'
-                      }
-                    >
-                      {connection.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {connection.latency !== undefined && (
+                        <Badge variant="outline" className="font-mono text-xs text-muted-foreground bg-white/20">
+                          {connection.latency} ms
+                        </Badge>
+                      )}
+                      <Badge
+                        className="uppercase text-xs font-bold"
+                        variant={
+                          connection.status === 'connected'
+                            ? 'default'
+                            : connection.status === 'warning'
+                            ? 'secondary'
+                            : 'destructive'
+                        }
+                      >
+                        {connection.status}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
 
                 <CardContent className="pt-6 space-y-6">
-                  {/* Config Info */}
                   <div>
                     <h3 className="font-semibold text-sm mb-2">Configuration</h3>
                     <div className="bg-muted p-3 rounded-lg text-sm font-mono text-muted-foreground break-all">
@@ -234,7 +248,6 @@ export default function ConnectionsPage() {
                     </div>
                   </div>
 
-                  {/* Environment Variables */}
                   <div>
                     <h3 className="font-semibold text-sm mb-3">Environment Variables</h3>
                     <div className="space-y-2">
@@ -273,7 +286,6 @@ export default function ConnectionsPage() {
                     </div>
                   </div>
 
-                  {/* Connection Tips */}
                   <div>
                     <h3 className="font-semibold text-sm mb-2">Setup Tips</h3>
                     <ul className="space-y-1 text-sm">
@@ -286,7 +298,6 @@ export default function ConnectionsPage() {
                     </ul>
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-2 pt-2">
                     <Button
                       size="sm"
@@ -316,7 +327,6 @@ export default function ConnectionsPage() {
             ))}
           </div>
 
-          {/* Quick Start Section */}
           <Card className="mt-8 border-primary/20 bg-primary/5">
             <CardHeader>
               <CardTitle>Quick Setup</CardTitle>

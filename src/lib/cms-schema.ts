@@ -123,6 +123,45 @@ export const PAGE_SCHEMAS: Record<string, SectionSchema[]> = {
       ]
     },
     {
+      key: 'impact',
+      label: 'Our Impact by the Numbers',
+      description: 'Configure the stats and impact numbers displayed on the landing page.',
+      fields: [
+        { key: 'badgeText', label: 'Badge Text', type: 'text', placeholder: 'PROVEN EXCELLENCE' },
+        { key: 'badgeBg', label: 'Badge Background Color', type: 'text', placeholder: 'e.g. #FF0000 or transparent' },
+        { key: 'badgeTextColor', label: 'Badge Text Color', type: 'text', placeholder: 'e.g. #FFFFFF' },
+        { key: 'badgeBorderColor', label: 'Badge Border Color', type: 'text', placeholder: 'e.g. #FF0000' },
+        { key: 'badgeBorderRadius', label: 'Badge Border Radius', type: 'select', options: ['full', 'xl', 'lg', 'md', 'none'] },
+        { key: 'heading', label: 'Section Heading', type: 'richtext', placeholder: 'Our Impact by the Numbers' },
+        { key: 'subtitle', label: 'Section Subtitle', type: 'richtext', placeholder: 'Join thousands of learners who are transforming their careers and skills' },
+        {
+          key: 'stats',
+          label: 'Impact Statistics List',
+          type: 'list',
+          itemFields: [
+            { key: 'value', label: 'Stat Metric (e.g. 19,332+)', type: 'text' },
+            { key: 'label', label: 'Stat Subtitle (e.g. HAPPY STUDENTS)', type: 'text' },
+            { key: 'icon', label: 'Icon Name (Users, BookOpen, Video, Award)', type: 'select', options: ['Users', 'BookOpen', 'Video', 'Award'] }
+          ]
+        }
+      ]
+    },
+    {
+      key: 'cta',
+      label: 'Call-to-Action Section',
+      description: 'Configure the primary landing page Call-to-Action banner.',
+      fields: [
+        { key: 'badgeText', label: 'Badge Text', type: 'text', placeholder: 'START YOUR JOURNEY' },
+        { key: 'badgeBg', label: 'Badge Background Color', type: 'text', placeholder: 'e.g. #FF0000 or transparent' },
+        { key: 'badgeTextColor', label: 'Badge Text Color', type: 'text', placeholder: 'e.g. #FFFFFF' },
+        { key: 'badgeBorderColor', label: 'Badge Border Color', type: 'text', placeholder: 'e.g. #FF0000' },
+        { key: 'badgeBorderRadius', label: 'Badge Border Radius', type: 'select', options: ['full', 'xl', 'lg', 'md', 'none'] },
+        { key: 'title', label: 'Heading Title', type: 'richtext', placeholder: 'Ready to Build & Ship Real Projects?' },
+        { key: 'description', label: 'Description Text', type: 'textarea', placeholder: 'Get instant access to production-grade courses...' },
+        { key: 'buttonText', label: 'CTA Button Text', type: 'text', placeholder: 'Start Learning Now' }
+      ]
+    },
+    {
       key: 'seo',
       label: 'SEO Metadata',
       description: 'Configure SEO titles, descriptions, and keywords for search engines.',

@@ -45,6 +45,13 @@ export async function POST(req: Request) {
       instagram_url: payload.instagram_url || '',
       youtube_url: payload.youtube_url || '',
       whatsapp_url: payload.whatsapp_url || '',
+      certificate_template: payload.certificate_template || '',
+      cert_font_family: payload.cert_font_family || 'helvetica',
+      cert_font_bold: payload.cert_font_bold ?? true,
+      cert_font_italic: payload.cert_font_italic ?? false,
+      cert_font_color: payload.cert_font_color || '#cc3333',
+      cert_title_color: payload.cert_title_color || '#1e3a8a',
+      cert_exam_color: payload.cert_exam_color || '#33994c',
       updated_at: new Date()
     };
 

@@ -28,12 +28,12 @@ interface StaffUser {
 }
 
 // Fixed role options for Staff Console — exactly these 3 roles
-const STAFF_ROLES = ['admin', 'super_admin', 'editor'] as const;
+const STAFF_ROLES = ['admin', 'super_admin', 'editor', 'instructor'] as const;
 
 export default function StaffAdminPage() {
   const confirm = useConfirm();
   const [staffList, setStaffList] = useState<StaffUser[]>([]);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -69,9 +69,9 @@ export default function StaffAdminPage() {
       setError(error.message);
       setStaffList([]);
     } else {
-      const profiles = (data || []) as any[];
+      const profiles = (data || []) as Record<string, any>[];
       const filtered = profiles.filter((profile) => STAFF_ROLES.includes(profile.role));
-      setStaffList(filtered.map((profile: any) => ({
+      setStaffList(filtered.map((profile: Record<string, any>) => ({
         id: profile.id || profile._id,
         email: profile.email,
         name: profile.full_name || profile.name || '',

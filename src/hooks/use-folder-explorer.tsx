@@ -31,7 +31,15 @@ export function useFolderExplorer(module: string = "default") {
 
       if (error) throw error;
 
-      const folders = (data || []) as any[];
+      interface RawFolder {
+        id: string;
+        title: string;
+        parent_folder_id: string | null;
+        module: string;
+        is_paid?: boolean;
+        sort_order?: number;
+      }
+      const folders = (data || []) as RawFolder[];
       const buildTree = (parentId: string | null): FolderNode[] => {
         return folders
           .filter((f) => f.parent_folder_id === parentId)

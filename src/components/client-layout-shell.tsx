@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { Navbar } from "@/components/navbar";
+import { SessionTimeout } from "@/components/session-timeout";
 import { PageTransition } from "@/components/page-transition";
 import { Toaster } from "@/components/ui/toaster";
 import { GoToMainSite } from "@/components/go-to-main-site";
@@ -33,7 +34,8 @@ import {
   MessageSquare,
   Sparkles,
   Database,
-  Activity
+  Activity,
+  Loader2
 } from "lucide-react";
 
 export function ClientLayoutShell({ children }: { children: React.ReactNode }) {
@@ -106,7 +108,14 @@ export function ClientLayoutShell({ children }: { children: React.ReactNode }) {
 
     const originalFetch = window.fetch;
     window.fetch = async (input, init) => {
-      const url = typeof input === 'string' ? input : (input as Request).url;
+      let url = '';
+      if (typeof input === 'string') {
+        url = input;
+      } else if (input instanceof URL) {
+        url = input.href;
+      } else if (input && typeof input === 'object') {
+        url = (input as any).url || (input as any).href || '';
+      }
       const method = (init?.method || 'GET').toUpperCase();
 
       // Intercept calls to database APIs (exclude analytics / background token check / security logs)
@@ -197,6 +206,64 @@ export function ClientLayoutShell({ children }: { children: React.ReactNode }) {
       window.fetch = originalFetch;
     };
   }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    
+    let title = "Support Console";
+    if (pathname === '/login') {
+      title = "Sign In | Support Console";
+    } else if (pathname === '/') {
+      title = "Dashboard | Support Console";
+    } else if (pathname === '/certificate-template') {
+      title = "Certificate Templates | Support Console";
+    } else if (pathname === '/blogs/comments') {
+      title = "Comments Moderation | Support Console";
+    } else if (pathname === '/connections') {
+      title = "Connections Settings | Support Console";
+    } else if (pathname === '/analytics') {
+      title = "Analytics | Support Console";
+    } else if (pathname === '/assets') {
+      title = "Assets Manager | Support Console";
+    } else if (pathname === '/blogs') {
+      title = "Blogs Content | Support Console";
+    } else if (pathname === '/community') {
+      title = "Community Management | Support Console";
+    } else if (pathname === '/courses') {
+      title = "Course Catalog | Support Console";
+    } else if (pathname === '/curriculum-catalog') {
+      title = "Curriculum Catalog | Support Console";
+    } else if (pathname === '/enrollments') {
+      title = "Enrollments | Support Console";
+    } else if (pathname === '/notifications') {
+      title = "Notification Broadcasts | Support Console";
+    } else if (pathname === '/pages') {
+      title = "CMS Page Builder | Support Console";
+    } else if (pathname === '/realtime') {
+      title = "Realtime Stream | Support Console";
+    } else if (pathname === '/recycle-bin') {
+      title = "Recycle Bin | Support Console";
+    } else if (pathname === '/security') {
+      title = "Security Metrics | Support Console";
+    } else if (pathname === '/settings') {
+      title = "Global Settings | Support Console";
+    } else if (pathname === '/staff') {
+      title = "Staff Directory | Support Console";
+    } else if (pathname === '/tests') {
+      title = "Assessments | Support Console";
+    } else if (pathname === '/updates') {
+      title = "Updates Registry | Support Console";
+    } else if (pathname === '/users') {
+      title = "Identity Registrations | Support Console";
+    } else {
+      const parts = pathname.split('/').filter(Boolean);
+      if (parts.length > 0) {
+        const capitalized = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).replace(/-/g, ' ')).join(' - ');
+        title = `${capitalized} | Support Console`;
+      }
+    }
+    document.title = title;
+  }, [pathname, mounted]);
 
   useEffect(() => {
     setMounted(true);
@@ -992,15 +1059,26 @@ export function ClientLayoutShell({ children }: { children: React.ReactNode }) {
   const isAdminPanelRoute = adminSegments.has(firstSegment);
   const shouldHideSiteChrome = isAdminPanelRoute || isAdminRoot || isAuthRoute;
 
+  const hasLocalSession = typeof window !== 'undefined' && localStorage.getItem('xmarty_session');
+
   if (!mounted) {
+    const shouldRender = isAuthRoute;
     return (
       <ConfirmProvider>
         <div className="min-h-screen flex flex-col">
-          <main className="flex-1 w-full">{children}</main>
+          <main className="flex-1 w-full">
+            {shouldRender ? children : (
+              <div className="min-h-screen flex items-center justify-center bg-muted/10">
+                <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+              </div>
+            )}
+          </main>
         </div>
       </ConfirmProvider>
     );
   }
+
+  const shouldRenderChildren = isAuthRoute || (mounted && hasLocalSession);
 
   return (
     <ConfirmProvider>
@@ -1011,10 +1089,15 @@ export function ClientLayoutShell({ children }: { children: React.ReactNode }) {
               "flex-1 w-full max-w-full overflow-x-hidden"
             )}
           >
-            {children}
+            {shouldRenderChildren ? children : (
+              <div className="min-h-screen flex items-center justify-center bg-muted/10">
+                <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+              </div>
+            )}
           </main>
         </PageTransition>
         <Toaster />
+        {!isAuthRoute && <SessionTimeout />}
         <GoToMainSite />
 
         {/* Custom Context Menu Rendering */}
@@ -1036,6 +1119,7 @@ export function ClientLayoutShell({ children }: { children: React.ReactNode }) {
           description={overlayDesc}
           successTitle={overlaySuccessTitle}
           successDescription={overlaySuccessDesc}
+          errorDescription={overlayDesc}
           onClose={() => setOverlayOpen(false)}
         />
       </div>

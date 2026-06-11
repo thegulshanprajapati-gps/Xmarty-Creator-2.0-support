@@ -55,14 +55,14 @@ export function PageTransition({
   // Prevent hydration mismatch by ensuring server and client start with same shell
   if (!mounted) {
     return (
-      <div className="relative flex-1 flex flex-col min-h-0">
+      <div className="relative flex-1 flex flex-col min-h-0 w-full">
         {children}
       </div>
     );
   }
 
   return (
-    <div className="relative flex-1 flex flex-col min-h-0">
+    <div className="relative flex-1 flex flex-col min-h-0 w-full">
       <AnimatePresence mode="wait">
         {isPending ? (
           <motion.div
@@ -148,7 +148,7 @@ export function PageTransition({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="flex-1 flex flex-col min-h-0"
+            className="flex-1 flex flex-col min-h-0 w-full"
           >
             {children}
           </motion.div>

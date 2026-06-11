@@ -17,25 +17,27 @@ export type Page = {
 
 export async function getPages(publishedOnly = true): Promise<Page[]> {
   const db = await getDb();
-  const filter: any = {};
+  const filter: Record<string, any> = {};
   if (publishedOnly) filter.status = 'published';
   const data = await db.collection('pages').find(filter).toArray();
-  return data.map((doc: any) => ({
-    ...doc,
-    id: doc._id.toString(),
-    _id: undefined
-  } as any)) as Page[];
+  return data.map((doc) => {
+    const { _id, ...rest } = doc;
+    return {
+      ...rest,
+      id: _id.toString(),
+    } as unknown as Page;
+  });
 }
 
 export async function getPageBySlug(slug: string): Promise<Page | null> {
   const db = await getDb();
   const doc = await db.collection('pages').findOne({ slug });
   if (!doc) return null;
+  const { _id, ...rest } = doc;
   return {
-    ...doc,
-    id: doc._id.toString(),
-    _id: undefined
-  } as any as Page;
+    ...rest,
+    id: _id.toString(),
+  } as unknown as Page;
 }
 
 export async function upsertPage(payload: Partial<Page>): Promise<Page> {
@@ -43,9 +45,7 @@ export async function upsertPage(payload: Partial<Page>): Promise<Page> {
   const slug = payload.slug;
   if (!slug) throw new Error('Page slug is required for upsert');
   
-  const normalized = { ...payload };
-  delete (normalized as any).id;
-  delete (normalized as any)._id;
+  const { id, ...normalized } = payload;
 
   await db.collection('pages').updateOne(
     { slug },

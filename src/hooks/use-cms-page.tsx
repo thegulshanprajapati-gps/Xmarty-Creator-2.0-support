@@ -28,19 +28,19 @@ export function useCmsPage(identifier?: string) {
       const res = identifierIsUUID
         ? await query.eq('id', identifier).maybeSingle()
         : await query.eq('slug', identifier).maybeSingle();
-      const data = res.data as any;
+      const data = res.data as CmsPage | null;
       if (!data) {
         // create a minimal page if missing
-        const seed = {
+        const seed: CmsPage = {
           slug: identifierIsUUID ? undefined : identifier,
           id: identifierIsUUID ? identifier : undefined,
           title: String(identifier),
           description: '',
           content: { blocks: [] },
           status: 'draft',
-        } as any;
+        };
         const up = await db.from('pages').upsert(seed, { onConflict: identifierIsUUID ? 'id' : 'slug' }).select().maybeSingle();
-        setPage(up.data || seed);
+        setPage((up.data as CmsPage) || seed);
       } else {
         setPage(data);
       }

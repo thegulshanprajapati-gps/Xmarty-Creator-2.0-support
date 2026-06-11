@@ -535,6 +535,180 @@ export default function CurriculumCatalogPage() {
   const [advancingCourse, setAdvancingCourse] = useState<ExplorerItem | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const handleDownloadCSV = async () => {
+    try {
+      const { data, error } = await db
+        .from('course_folders')
+        .select('*')
+        .eq('course_id', 'curriculum-catalog')
+        .eq('parent_folder_id', null);
+
+      if (error || !data) {
+        toast({ variant: "destructive", title: "Failed to download curriculum structure", description: error?.message });
+        return;
+      }
+
+      const headers = ["Title", "Description", "Is Paid", "Category", "Level", "Instructor", "Duration", "Students", "Price", "Visibility", "Slug"];
+      const rows = data.map((f: any) => [
+        f.title || "",
+        f.description || "",
+        f.is_paid ? "TRUE" : "FALSE",
+        f.category || "Programming",
+        f.level || "Beginner",
+        f.instructor || "",
+        f.duration || "",
+        f.students || "",
+        f.price || "",
+        f.visibility || "Private",
+        f.slug || ""
+      ]);
+
+      const escapeCSV = (val: string) => {
+        const clean = val.replace(/"/g, '""');
+        return `"${clean}"`;
+      };
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((r: string[]) => r.map(escapeCSV).join(","))
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `curriculum_structure_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({ title: "Curriculum database exported successfully!" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Export failed", description: e.message || String(e) });
+    }
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l);
+        if (lines.length <= 1) {
+          toast({ variant: "destructive", title: "Empty or invalid CSV file" });
+          return;
+        }
+
+        const parseCSVLine = (line: string) => {
+          const result = [];
+          let current = "";
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++;
+              } else {
+                inQuotes = !inQuotes;
+              }
+            } else if (char === ',' && !inQuotes) {
+              result.push(current);
+              current = "";
+            } else {
+              current += char;
+            }
+          }
+          result.push(current);
+          return result;
+        };
+
+        const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+        let importCount = 0;
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = parseCSVLine(lines[i]);
+          if (values.length < header.length) continue;
+
+          const record: Record<string, any> = {};
+          header.forEach((key, idx) => {
+            let fieldName = key;
+            if (key === "title") fieldName = "title";
+            else if (key === "description") fieldName = "description";
+            else if (key === "is paid" || key === "is_paid") fieldName = "is_paid";
+            else if (key === "category") fieldName = "category";
+            else if (key === "level") fieldName = "level";
+            else if (key === "instructor") fieldName = "instructor";
+            else if (key === "duration") fieldName = "duration";
+            else if (key === "students") fieldName = "students";
+            else if (key === "price") fieldName = "price";
+            else if (key === "visibility") fieldName = "visibility";
+            else if (key === "slug") fieldName = "slug";
+
+            record[fieldName] = values[idx];
+          });
+
+          const title = record.title || "Unnamed Course";
+          const slug = record.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+          const isPaid = String(record.is_paid).toUpperCase() === "TRUE";
+
+          const { data: mainFolder, error: mainErr } = await db.from('course_folders').insert({
+            course_id: 'curriculum-catalog',
+            title,
+            slug,
+            description: record.description || null,
+            parent_folder_id: null,
+            sort_order: i,
+            is_paid: isPaid,
+            category: record.category || "Programming",
+            level: record.level || "Beginner",
+            instructor: record.instructor || "",
+            duration: record.duration || "",
+            students: record.students || "",
+            price: record.price || "",
+            visibility: record.visibility || "Private"
+          });
+
+          if (mainErr) {
+            console.error("Error importing course:", mainErr);
+            continue;
+          }
+
+          if (mainFolder?.id) {
+            await db.from('course_folders').insert({
+              course_id: 'curriculum-catalog',
+              title: '.thumbnail',
+              description: 'Course thumbnail resources',
+              parent_folder_id: mainFolder.id,
+              sort_order: 1,
+              is_paid: isPaid,
+            });
+
+            await db.from('course_folders').insert({
+              course_id: 'curriculum-catalog',
+              title: 'content',
+              description: 'Course lectures and files',
+              parent_folder_id: mainFolder.id,
+              sort_order: 2,
+              is_paid: isPaid,
+            });
+          }
+          importCount++;
+        }
+
+        toast({ title: `Curriculum imported successfully! (${importCount} courses added) 🎉` });
+        setRefreshKey(k => k + 1);
+      } catch (err: any) {
+        toast({ variant: "destructive", title: "Import failed", description: err.message || String(err) });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleEditCourse = (item: ExplorerItem) => {
     setAdvancingCourse(null);
     setEditingCourse(item);
@@ -564,6 +738,33 @@ export default function CurriculumCatalogPage() {
             <h1 className="font-headline font-bold text-xl">Curriculum Catalog</h1>
             <p className="text-xs text-muted-foreground">Manage folders, upload content, and shape learning pathways. <strong>Right-click</strong> a course folder to edit its page.</p>
           </div>
+          {!(editingCourse || advancingCourse) && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs font-bold border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                onClick={() => document.getElementById('curriculum-csv-import')?.click()}
+              >
+                📥 Import Curriculum
+              </Button>
+              <input
+                id="curriculum-csv-import"
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleImportCSV}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs font-bold border-sky-500/30 hover:bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                onClick={handleDownloadCSV}
+              >
+                📤 Download Curriculum
+              </Button>
+            </div>
+          )}
           {(editingCourse || advancingCourse) && (
             <div className={`flex items-center gap-2 text-xs font-semibold rounded-lg px-3 py-1.5 shrink-0 ${
               advancingCourse

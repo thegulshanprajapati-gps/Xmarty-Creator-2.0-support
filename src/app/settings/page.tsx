@@ -69,7 +69,7 @@ export default function SystemSettingsPage() {
 
   useEffect(() => {
     const handleSaveTrigger = () => {
-      const mockEvent = { preventDefault: () => {} } as any;
+      const mockEvent = { preventDefault: () => {} } as unknown as React.FormEvent;
       handleSaveSettings(mockEvent);
     };
     window.addEventListener('settings-save', handleSaveTrigger);

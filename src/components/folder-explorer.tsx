@@ -192,7 +192,7 @@ export function FolderExplorer({
             onKeyDown={(e) => {
               if (e.key === "Enter") handleCreateFolder(null);
               if (e.key === "Escape") {
-                setCreatingParentId(undefined as any);
+                setCreatingParentId(null);
                 setNewFolderName("");
               }
             }}

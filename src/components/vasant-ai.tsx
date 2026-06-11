@@ -31,8 +31,9 @@ export function VasantAI() {
     try {
       const res = await assistStudentWithFAQAndNavigation({ query: userQuery });
       setMessages(prev => [...prev, { role: 'bot', content: res.answer }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'bot', content: "I'm having a slight hitch in my processing. Please try again later!" }]);
+    } catch (err: any) {
+      const errorMsg = err?.message || "I'm having a slight hitch in my processing. Please try again later!";
+      setMessages(prev => [...prev, { role: 'bot', content: errorMsg }]);
     } finally {
       setLoading(false);
     }
@@ -48,8 +49,9 @@ export function VasantAI() {
         currentKnowledge: "Intermediate JavaScript and basic React"
       });
       setMessages(prev => [...prev, { role: 'bot', content: res.suggestedCoursePath }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'bot', content: "Failed to generate your personalized path." }]);
+    } catch (err: any) {
+      const errorMsg = err?.message || "Failed to generate your personalized path.";
+      setMessages(prev => [...prev, { role: 'bot', content: errorMsg }]);
     } finally {
       setLoading(false);
       setMode('chat');

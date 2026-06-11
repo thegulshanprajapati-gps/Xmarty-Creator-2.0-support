@@ -4,7 +4,7 @@ import webpush from 'web-push';
 
 export async function POST(req: NextRequest) {
   try {
-    const { title, body, url: targetUrl } = await req.json();
+    const { title, body, url: targetUrl, studentId, studentEmail } = await req.json();
 
     if (!title || !body) {
       return NextResponse.json({ error: 'Title and body are required' }, { status: 400 });
@@ -21,7 +21,15 @@ export async function POST(req: NextRequest) {
     webpush.setVapidDetails(vapidSubject, publicVapidKey, privateVapidKey);
 
     const db = await getDb();
-    const subscriptions = await db.collection('push_subscriptions').find({}).toArray();
+    
+    const filter: Record<string, any> = {};
+    if (studentId) {
+      filter.user_id = studentId;
+    } else if (studentEmail) {
+      filter.user_email = studentEmail;
+    }
+    
+    const subscriptions = await db.collection('push_subscriptions').find(filter).toArray();
 
     if (subscriptions.length === 0) {
       return NextResponse.json({ success: true, message: 'No subscribers' });

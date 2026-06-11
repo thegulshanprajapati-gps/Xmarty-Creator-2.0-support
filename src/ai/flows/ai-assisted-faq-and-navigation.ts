@@ -7,7 +7,7 @@
  * - AssistStudentWithFAQAndNavigationOutput - The return type for the assistStudentWithFAQAndNavigation function.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, hasGeminiApiKey } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AssistStudentWithFAQAndNavigationInputSchema = z.object({
@@ -42,6 +42,9 @@ const assistStudentWithFAQAndNavigationFlow = ai.defineFlow(
     outputSchema: AssistStudentWithFAQAndNavigationOutputSchema,
   },
   async (input) => {
+    if (!hasGeminiApiKey()) {
+      throw new Error('Gemini API not found - got it >>');
+    }
     const { output } = await prompt(input);
     return output!;
   }

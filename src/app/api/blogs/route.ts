@@ -57,6 +57,10 @@ export async function POST(request: Request) {
       excerptColor: payload.excerptColor || '',
       authorFont: payload.authorFont || '',
       authorColor: payload.authorColor || '',
+      // Block CMS Content Builder integration
+      blocks: payload.blocks || [],
+      fontConfig: payload.fontConfig || null,
+      sidebarConfig: payload.sidebarConfig || [],
       updated_at: new Date()
     };
 

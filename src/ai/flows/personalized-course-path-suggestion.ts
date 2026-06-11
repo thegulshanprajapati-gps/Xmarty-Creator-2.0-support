@@ -7,7 +7,7 @@
  * - PersonalizedCoursePathSuggestionOutput - The return type for the personalizedCoursePathSuggestion function.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, hasGeminiApiKey } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const PersonalizedCoursePathSuggestionInputSchema = z.object({
@@ -63,6 +63,9 @@ const personalizedCoursePathSuggestionFlow = ai.defineFlow(
     outputSchema: PersonalizedCoursePathSuggestionOutputSchema,
   },
   async (input) => {
+    if (!hasGeminiApiKey()) {
+      throw new Error('Gemini API not found - got it >>');
+    }
     const { output } = await personalizedCoursePathSuggestionPrompt(input);
     return output!;
   }

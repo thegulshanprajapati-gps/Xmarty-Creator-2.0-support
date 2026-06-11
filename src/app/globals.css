@@ -140,3 +140,13 @@ html, body {
 }
 
 #cms-dynamic-orchestration {}
+
+/* Force admin console headers to be sticky */
+header.flex.h-16 {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 40 !important;
+  background-color: hsl(var(--background) / 0.8) !important;
+  backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid hsl(var(--border) / 0.8) !important;
+}
